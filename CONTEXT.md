@@ -44,6 +44,15 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 | PostHog Cloud EU, free tier | Self-hosting is out of scope |
 | Skeleton `CLAUDE.md` / `AGENTS.md` removed | They instruct host-side PHP and Boost installs, which conflicts with container-only commands |
 
+## Git hooks
+
+Husky-managed, tracked in `.husky/`, installed by `npm install` (`prepare` script). Hook bodies are POSIX `sh` because Husky ignores the shebang.
+
+| Hook | Checks |
+|---|---|
+| `commit-msg` | Entirely lowercase, Conventional Commits `type: description`, no scopes |
+| `pre-commit` | `./vendor/bin/pint --test`, then `osv-scanner --lockfile=composer.lock` (runs on the host; needs host PHP and `osv-scanner`) |
+
 ## Gotchas
 
 - On a fresh clone the `queue` container restart-loops until the first `migrate` creates the `jobs` table; it recovers on its own afterwards
