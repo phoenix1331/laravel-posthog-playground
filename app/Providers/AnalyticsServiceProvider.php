@@ -6,14 +6,31 @@ namespace App\Providers;
 
 use App\Analytics\Analytics;
 use App\Analytics\NullAnalytics;
+use App\Analytics\PostHogAnalytics;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
+use PostHog\Client;
 
 class AnalyticsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(Analytics::class, fn (): Analytics => $this->nullAnalytics());
+        $this->app->singleton(Analytics::class, function (): Analytics {
+            if (! self::sending()) {
+                return $this->nullAnalytics();
+            }
+
+            return new PostHogAnalytics;
+        });
+
+        // Used by the queue worker to deliver capture jobs. Flag definitions
+        // are not loaded here: capture never evaluates flags, and loading
+        // them would cost an HTTP call whenever a secret key is set.
+        $this->app->singleton(Client::class, fn (): Client => new Client(
+            apiKey: config('posthog.project_token'),
+            options: ['host' => config('posthog.host'), ...config('posthog.client')],
+            loadFeatureFlags: false,
+        ));
     }
 
     /**

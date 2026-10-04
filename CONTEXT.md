@@ -68,11 +68,15 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | Class | Role |
 |---|---|
 | `App\Analytics\Analytics` | Interface: `capture()`, `identify()`, `alias()`, `groupIdentify()` |
+| `App\Analytics\PostHogAnalytics` | Bound when `sending()`; builds PostHog messages, stamps time and UUID v7 at dispatch, queues `CaptureAnalyticsEvent` on `posthog.queue` |
+| `App\Jobs\CaptureAnalyticsEvent` | Delivers one message via `PostHog\Client` (`capture`/`identify`/`alias`), then `flush()`; throws `AnalyticsDeliveryFailed` on rejection; 5 tries, backoff 5s/30s/2m/10m |
 | `App\Analytics\NullAnalytics` | No token or disabled; drops calls, or logs them when `posthog.log_channel` is set |
 | `App\Analytics\FakeAnalytics` | Test double recording calls; `assertCaptured()`, `assertCapturedTimes()`, `assertNotCaptured()`, `assertNothingCaptured()`, `assertIdentified()`, `assertAliased()`, `assertGroupIdentified()` |
-| `App\Providers\AnalyticsServiceProvider` | Binds `Analytics` as a singleton; `sending()` is true only with a token and the kill switch off |
+| `App\Providers\AnalyticsServiceProvider` | Binds `Analytics` (PostHog when `sending()`, else null) and a `PostHog\Client` singleton for the worker, built with `loadFeatureFlags: false` |
 
-Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return a `FakeAnalytics`.
+Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return a `FakeAnalytics`. `tests/Support/RecordingHttpClient.php` replaces the SDK's HTTP layer so jobs run through the real `PostHog\Client` and tests assert on the `/batch/` payload without network access.
+
+**Delivery rules:** event time is fixed when the call is made (queue lag never shifts it; simulator timestamps pass straight through); each message carries a UUID generated once, so a retried job is de-duplicated by PostHog; every job flushes because the client batches in memory and a long-running worker would otherwise hold events; `groupIdentify()` is sent as a `$groupidentify` capture because `PostHog\Client` has no such method.
 
 ## Event catalogue
 
@@ -149,6 +153,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | Database queue driver, no Redis | Keeps the stack small; volume is low for a playground |
 | PostHog Cloud EU, free tier | Self-hosting is out of scope |
 | Dedicated `analytics` queue | Capture backlog never delays app jobs and can be monitored or scaled on its own |
+| Queue the PostHog message, not the domain call | The job is a dumb courier; format, time and UUID are decided once in the request, so retries are identical |
 | SDK client built from config, not `PostHog::init()` | A container-bound instance is swappable in tests; the static facade also reads `POSTHOG_API_KEY` from the environment implicitly |
 | Skeleton `CLAUDE.md` / `AGENTS.md` removed | They instruct host-side PHP and Boost installs, which conflicts with container-only commands |
 
