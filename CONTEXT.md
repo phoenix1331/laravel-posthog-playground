@@ -24,11 +24,28 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 
 **Commands:** `Makefile` is the entry point (`make help` lists targets). All artisan, composer and test commands run inside the container via `docker compose exec app ...`, never on the host.
 
+## Domain model
+
+| Model | Table | Notes |
+|---|---|---|
+| `Club` | `clubs` | Invented club with stadium and capacity |
+| `Competition` | `competitions` | League or cup |
+| `SupportersClub` | `supporters_clubs` | Belongs to a club; becomes a PostHog group |
+| `User` | `users` | `is_admin`, optional `supporters_club_id` |
+| `Stand` | `stands` | Belongs to a club; `price_band` (`App\Enums\PriceBand`), `price_pence`, `is_away_end` |
+| `Fixture` | `fixtures` | Home and away club, competition, `kicks_off_at`; routed by `slug`; `upcoming()` scope |
+| `TicketAllocation` | `ticket_allocations` | Stock per fixture per stand (`capacity`, `sold`); near sell-out at 90% |
+| `TravelOption` | `travel_options` | Coach to an away fixture with its own capacity |
+| `Booking` | `bookings` | Purchase record with `reference`, quantity, ticket/travel/total in pence |
+
+Money is stored as integer pence. Seats are not modelled individually: stock per fixture per stand is enough for funnel and sell-out behaviour.
+
 ## Key directories
 
 | Path | Purpose |
 |---|---|
 | `app/` | Application code |
+| `app/Enums/` | Backed enums (`PriceBand`) |
 | `database/` | Migrations, factories, seeders |
 | `resources/` | Blade views, JS and CSS built by Vite |
 | `routes/web.php` | Web routes |
