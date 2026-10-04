@@ -22,6 +22,8 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 
 **Ports:** defaults are app 8000 and MySQL 3306. If a default is taken on the host, bump it (8001, 8002... / 3307, 3308...) in `.env` via `APP_PORT` / `FORWARD_DB_PORT` and update `APP_URL`. The original dev machine uses 8002 / 3308.
 
+**Front end:** Blade + Tailwind 4 via Vite 8. Node runs on the host, not in the image: `make assets` builds to `public/build`, `make vite` runs the dev server with hot reload (writes `public/hot`). FrankenPHP serves the app, so `php artisan dev` is not used. Tests call `withoutVite()` in `tests/TestCase.php`.
+
 **Commands:** `Makefile` is the entry point (`make help` lists targets). All artisan, composer and test commands run inside the container via `docker compose exec app ...`, never on the host.
 
 ## Domain model
@@ -61,7 +63,9 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | `app/Enums/` | Backed enums (`PriceBand`) |
 | `database/` | Migrations, factories, seeders |
 | `resources/` | Blade views, JS and CSS built by Vite |
-| `routes/web.php` | Web routes |
+| `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page |
+| `resources/views/components/layouts/app.blade.php` | Anonymous layout component (`<x-layouts.app>`) |
+| `app/Support/` | Small helpers (`Money::format()` for pence to pounds) |
 | `tests/` | Pest suites: `Unit` (no framework), `Feature` (full app via `tests/Pest.php`), `Arch` (`tests/ArchTest.php`) |
 
 ## Decisions
@@ -71,6 +75,7 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | MySQL + Docker/FrankenPHP instead of the brief's SQLite + Herd | Project default stack; reproducible on any machine, closer to production |
 | Separate `queue` container | Capture runs off the request path; worker lifecycle is visible in `docker compose ps` |
 | In-memory SQLite for tests, MySQL for the app | Fast, isolated tests with no second MySQL database to provision; avoid MySQL-only SQL in app code |
+| Node on the host, not in the PHP image | Husky already needs host Node; keeps the FrankenPHP image lean |
 | Database queue driver, no Redis | Keeps the stack small; volume is low for a playground |
 | PostHog Cloud EU, free tier | Self-hosting is out of scope |
 | Skeleton `CLAUDE.md` / `AGENTS.md` removed | They instruct host-side PHP and Boost installs, which conflicts with container-only commands |

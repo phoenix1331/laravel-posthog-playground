@@ -78,6 +78,22 @@ class Fixture extends Model
     }
 
     /**
+     * Cheapest ticket still on sale, or null when every stand is sold out.
+     * Expects ticketAllocations.stand to be eager loaded.
+     */
+    public function cheapestAvailablePricePence(): ?int
+    {
+        return $this->ticketAllocations
+            ->reject->isSoldOut()
+            ->min(fn (TicketAllocation $allocation) => $allocation->stand->price_pence);
+    }
+
+    public function isSellingFast(): bool
+    {
+        return $this->ticketAllocations->contains->isNearSellOut();
+    }
+
+    /**
      * @param  Builder<Fixture>  $query
      */
     #[Scope]

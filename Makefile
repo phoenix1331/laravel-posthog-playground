@@ -2,7 +2,7 @@
 
 EXEC = docker compose exec app
 
-.PHONY: help up down build restart shell migrate seed fresh test logs queue-logs queue-restart
+.PHONY: help up down build restart shell migrate seed fresh test logs queue-logs queue-restart assets vite
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -42,3 +42,9 @@ queue-logs: ## Tail queue worker logs
 
 queue-restart: ## Restart the queue worker to pick up code changes
 	@docker compose restart queue
+
+assets: ## Build front-end assets with Vite (runs on the host)
+	@npm run build
+
+vite: ## Start the Vite dev server with hot reload (runs on the host)
+	@npm run dev
