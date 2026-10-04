@@ -60,6 +60,34 @@ Content-Type: application/x-www-form-urlencoded
 
 _token={{csrfToken}}&_method=DELETE
 
+### Checkout (log in first; needs a basket)
+
+# Order summary and fake card form; guests are redirected to /login and returned here
+GET {{baseUrl}}/checkout
+Accept: text/html
+
+###
+
+# Pay with the test card; creates the booking, takes stock, fires TicketPurchased, redirects to /bookings/{reference}
+POST {{baseUrl}}/checkout
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}&name_on_card=Alex+Morgan&card_number=4242+4242+4242+4242
+
+###
+
+# Declined test card; redirects back to /checkout with an error, basket kept
+POST {{baseUrl}}/checkout
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}&name_on_card=Alex+Morgan&card_number=4000+0000+0000+0002
+
+###
+
+# Booking confirmation (owner only, 404 for anyone else); replace the reference
+GET {{baseUrl}}/bookings/MD-XXXXXXXX
+Accept: text/html
+
 ### Auth
 
 # Login page

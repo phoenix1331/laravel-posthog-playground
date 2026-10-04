@@ -27,6 +27,11 @@ class Booking extends Model
     /** @use HasFactory<BookingFactory> */
     use HasFactory;
 
+    public function getRouteKeyName(): string
+    {
+        return 'reference';
+    }
+
     /**
      * @return BelongsTo<User, $this>
      */

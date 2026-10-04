@@ -64,7 +64,9 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | `app/Enums/` | Backed enums (`PriceBand`) |
 | `database/` | Migrations, factories, seeders |
 | `resources/` | Blade views, JS and CSS built by Vite |
-| `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page, `POST /fixtures/{slug}/seats`, `/basket`, `POST`/`DELETE /basket/travel` |
+| `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page, `POST /fixtures/{slug}/seats`, `/basket`, `POST`/`DELETE /basket/travel`, `/checkout` (auth), `/bookings/{reference}` (owner only) |
+| `app/Checkout/` | `PlaceBooking` (locks stock, charges, books, dispatches `TicketPurchased`), `FakePaymentGateway`, `CheckoutFailed` |
+| `app/Events/` | Domain events (`TicketPurchased`, dispatched after commit) |
 | `app/Basket/CurrentBasket.php` | Session-scoped access to the visitor's basket (select seats, add/remove travel) |
 | `app/Http/Requests/` | Form requests holding stock, ownership and auth validation |
 | `app/Http/Controllers/Auth/` | Hand-rolled login, registration and logout; redirect to intended URL, else basket, else fixtures |
@@ -82,6 +84,9 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | Separate `queue` container | Capture runs off the request path; worker lifecycle is visible in `docker compose ps` |
 | In-memory SQLite for tests, MySQL for the app | Fast, isolated tests with no second MySQL database to provision; avoid MySQL-only SQL in app code |
 | Basket in a `baskets` table, only its ID in the session | The abandonment job must query idle baskets; serialised session payloads cannot be queried |
+| Checkout in a `PlaceBooking` action with `lockForUpdate()` | Stock re-checked under lock so the last seats cannot be sold twice; controller stays thin |
+| `TicketPurchased` implements `ShouldDispatchAfterCommit` | Analytics never records a purchase that rolled back |
+| Fake payment gateway with a declined test card | Gives the funnel a realistic payment failure point without real payments |
 | Hand-rolled auth, no starter kit | Keeps the login and registration seam visible for identity stitching (alias anonymous ID to user ID) |
 | Node on the host, not in the PHP image | Husky already needs host Node; keeps the FrankenPHP image lean |
 | Database queue driver, no Redis | Keeps the stack small; volume is low for a playground |
@@ -111,5 +116,7 @@ Husky-managed, tracked in `.husky/`, installed by `npm install` (`prepare` scrip
 
 - On a fresh clone the `queue` container restart-loops until the first `migrate` creates the `jobs` table; it recovers on its own afterwards
 - The image pre-creates `/config/psysh` owned by `app` so `php artisan tinker` works as the non-root user
+- Test cards: `4242 4242 4242 4242` succeeds, `4000 0000 0000 0002` is declined; card numbers are never stored
+- SQLite ignores `lockForUpdate()`, so locking is only exercised against MySQL, not in the test suite
 - Login and registration call `session()->regenerate()`, which keeps session data: the basket survives authentication, and so will the anonymous analytics ID
 - `.env` is not copied into the image (`.dockerignore`); it is read from the bind mount

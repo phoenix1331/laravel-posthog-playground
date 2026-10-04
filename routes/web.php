@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\BasketController;
+use App\Http\Controllers\BookingController;
+use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\FixtureController;
 use App\Http\Controllers\SeatSelectionController;
 use App\Http\Controllers\TravelController;
@@ -20,6 +22,13 @@ Route::middleware(EnsureBasketExists::class)->group(function (): void {
     Route::post('/basket/travel', [TravelController::class, 'store'])->name('travel.store');
     Route::delete('/basket/travel', [TravelController::class, 'destroy'])->name('travel.destroy');
 });
+
+Route::middleware(['auth', EnsureBasketExists::class])->group(function (): void {
+    Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
+    Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+});
+
+Route::get('/bookings/{booking}', [BookingController::class, 'show'])->middleware('auth')->name('bookings.show');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [LoginController::class, 'create'])->name('login');

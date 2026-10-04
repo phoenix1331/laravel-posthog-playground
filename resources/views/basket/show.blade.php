@@ -36,6 +36,12 @@
             </div>
         </dl>
 
+        @auth
+            <a href="{{ route('checkout.show') }}" class="mt-6 inline-block rounded-md bg-pitch-600 px-4 py-2 text-sm font-medium text-white hover:bg-pitch-700">
+                Continue to checkout
+            </a>
+        @endauth
+
         @guest
             <p class="mt-6 rounded-md bg-stone-100 px-4 py-3 text-sm text-stone-700">
                 <a href="{{ route('login') }}" class="font-medium text-pitch-700 hover:underline">Log in</a>
