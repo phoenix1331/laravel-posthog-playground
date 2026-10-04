@@ -40,6 +40,19 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 
 Money is stored as integer pence. Seats are not modelled individually: stock per fixture per stand is enough for funnel and sell-out behaviour.
 
+## Seed data
+
+`DatabaseSeeder` calls `ClubSeeder`, `CompetitionSeeder`, `SupportersClubSeeder`, `UserSeeder`, `FixtureSeeder`. Data is fixed (no Faker), every seeder upserts on a natural key so re-seeding is safe, and `WithoutModelEvents` keeps seeding from firing domain events.
+
+| Item | Detail |
+|---|---|
+| Clubs | 6 (`ClubSeeder::CLUBS`), each with Main (premium), North (standard), Family (value) and Away End (standard) stands priced from a per-club base |
+| Fixtures | 20 from the next Saturday: Premier Division round robin (15) plus County Shield midweek ties (5); dates are relative to seed time |
+| Stock | Per fixture per home stand; 5 big matches near sell-out with the away end sold out, others a stable 15-69% sold (hash of fixture and stand) |
+| Travel | Coach from the away club's city for every fixture, plus a supporters' club coach when the away club has one |
+| Users | `admin@matchday.test` plus 10 supporters (`firstname.lastname@matchday.test`, see `UserSeeder::SUPPORTERS`); all passwords `password` |
+| Supporters' clubs | 4 with 4, 3, 2 and 1 members |
+
 ## Key directories
 
 | Path | Purpose |
@@ -84,4 +97,5 @@ Husky-managed, tracked in `.husky/`, installed by `npm install` (`prepare` scrip
 ## Gotchas
 
 - On a fresh clone the `queue` container restart-loops until the first `migrate` creates the `jobs` table; it recovers on its own afterwards
+- The image pre-creates `/config/psysh` owned by `app` so `php artisan tinker` works as the non-root user
 - `.env` is not copied into the image (`.dockerignore`); it is read from the bind mount

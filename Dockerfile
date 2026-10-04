@@ -21,7 +21,8 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 RUN groupadd -g ${GROUP_ID} app \
     && useradd -u ${USER_ID} -g app -m app \
     && setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
-    && chown -R app:app /config/caddy /data/caddy
+    && mkdir -p /config/psysh \
+    && chown -R app:app /config/caddy /config/psysh /data/caddy
 
 WORKDIR /app
 
