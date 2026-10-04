@@ -117,3 +117,16 @@ POST {{baseUrl}}/logout
 Content-Type: application/x-www-form-urlencoded
 
 _token={{csrfToken}}
+
+### PostHog reverse proxy (only active with POSTHOG_PROJECT_TOKEN set; 404 otherwise)
+
+# Static bundle via the proxy, served from the assets host (no CSRF, no session)
+GET {{baseUrl}}/ingest/static/array.js
+
+###
+
+# Event batch as posthog-js sends it, forwarded to the ingestion host with path and query intact
+POST {{baseUrl}}/ingest/e/?ip=0
+Content-Type: application/json
+
+{"api_key": "phc_your_token", "event": "proxy_test", "distinct_id": "request-http", "properties": {}}

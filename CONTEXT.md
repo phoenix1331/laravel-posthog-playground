@@ -97,8 +97,18 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 - Every domain event carries `occurredAt` (default now; `TicketPurchased` uses `purchased_at`), passed through as the analytics timestamp so the simulator can backdate by dispatching the same events
 - `App\Listeners\AnalyticsEventSubscriber` is the single translation table, registered with `Event::subscribe()` in `AnalyticsServiceProvider::boot()`; methods are `on*` so listener auto-discovery does not register them twice; runs synchronously because delivery is already queued and the distinct ID needs the request session
 - Abandoned = `Basket::abandonable()`: checkout started, `user_id` set, `abandoned_at` null, `updated_at` at least `Basket::ABANDON_AFTER_MINUTES` (30) ago. A conditional `UPDATE ... WHERE abandoned_at IS NULL` claims each basket so overlapping sweeps cannot fire twice; `occurredAt` is last activity + 30 minutes. Only checkout-stage baskets qualify because the job has no session to recover an anonymous ID
-- `App\Analytics\DistinctId` (scoped per request): user ID when logged in, else a UUID v7 kept in the session under `analytics.anonymous_id`; `useAnonymousId()` overrides it outside HTTP (simulator)
+- `App\Analytics\DistinctId` (scoped): user ID when logged in, else the posthog-js cookie ID, else a UUID v7 kept in the session under `analytics.anonymous_id`; `useAnonymousId()` overrides it outside HTTP (simulator). It reads `request()` at call time because the subscriber, and so `DistinctId`, is first built at boot
 - Until identity stitching (alias on login) exists, anonymous and logged-in events are separate people, so the funnel breaks at login: the intended "before" picture
+
+## Client analytics (posthog-js)
+
+| Piece | Detail |
+|---|---|
+| `resources/js/analytics.js` | `posthog.init()` from JSON settings in the page; `api_host` `/ingest`, `defaults: '2026-08-30'`, `person_profiles: 'identified_only'`, session replay off until masking is configured |
+| `App\View\Components\PosthogConfig` (`<x-posthog-config />` in the layout) | Renders token, proxy path, UI host and `bootstrap.distinctID`; renders nothing unless `sending()`; never includes the secret key |
+| `App\Http\Controllers\IngestProxyController` (`ANY /ingest/{path?}`) | Registered in `bootstrap/app.php` `then:` outside the `web` group (no session, cookies or CSRF); forwards raw path and query, body, selected headers and `X-Forwarded-For`; `static/` and `array/` go to the assets host; 404 unless `sending()`, 502 if PostHog is unreachable |
+
+**Shared anonymous ID:** on a first visit the server's anonymous ID bootstraps posthog-js. After that, `DistinctId` adopts `distinct_id` from the posthog-js cookie `ph_<token>_posthog` (exempted from encryption by `AnalyticsServiceProvider::exemptPostHogCookie()`), because the cookie outlives the Laravel session. Malformed or oversized cookie values are ignored.
 
 ## Event catalogue
 
@@ -171,6 +181,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `TicketPurchased` implements `ShouldDispatchAfterCommit` | Analytics never records a purchase that rolled back |
 | Fake payment gateway with a declined test card | Gives the funnel a realistic payment failure point without real payments |
 | Hand-rolled auth, no starter kit | Keeps the login and registration seam visible for identity stitching (alias anonymous ID to user ID) |
+| Server bootstraps the client's anonymous ID, then adopts the cookie's | One person across client and server events without a round trip; survives session expiry |
 | Node on the host, not in the PHP image | Husky already needs host Node; keeps the FrankenPHP image lean |
 | Database queue driver, no Redis | Keeps the stack small; volume is low for a playground |
 | PostHog Cloud EU, free tier | Self-hosting is out of scope |
@@ -205,5 +216,6 @@ Husky-managed, tracked in `.husky/`, installed by `npm install` (`prepare` scrip
 - Test cards: `4242 4242 4242 4242` succeeds, `4000 0000 0000 0002` is declined; card numbers are never stored
 - SQLite ignores `lockForUpdate()`, so locking is only exercised against MySQL, not in the test suite
 - `CurrentBasket::selectSeats()` calls `unsetRelations()` after changing the selection; otherwise listeners would read the previously loaded stand
+- The proxy forwards `getRequestUri()` verbatim: route parameters drop trailing slashes and `getQueryString()` reorders keys. Laravel's test `call()` also trims trailing slashes, so the exact-path test goes through the HTTP kernel directly
 - Login and registration call `session()->regenerate()`, which keeps session data: the basket survives authentication, and so will the anonymous analytics ID
 - `.env` is not copied into the image (`.dockerignore`); it is read from the bind mount

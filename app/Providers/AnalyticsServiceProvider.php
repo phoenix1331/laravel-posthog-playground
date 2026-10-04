@@ -9,6 +9,7 @@ use App\Analytics\DistinctId;
 use App\Analytics\NullAnalytics;
 use App\Analytics\PostHogAnalytics;
 use App\Listeners\AnalyticsEventSubscriber;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
@@ -42,6 +43,21 @@ class AnalyticsServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::subscribe(AnalyticsEventSubscriber::class);
+
+        self::exemptPostHogCookie();
+    }
+
+    /**
+     * posthog-js writes its cookie as plain JSON; leave it unencrypted so
+     * DistinctId can adopt the browser's anonymous ID.
+     */
+    public static function exemptPostHogCookie(): void
+    {
+        $cookie = DistinctId::postHogCookieName();
+
+        if ($cookie !== null) {
+            EncryptCookies::except($cookie);
+        }
     }
 
     /**
