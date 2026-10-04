@@ -22,7 +22,7 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 
 **Ports:** defaults are app 8000 and MySQL 3306. If a default is taken on the host, bump it (8001, 8002... / 3307, 3308...) in `.env` via `APP_PORT` / `FORWARD_DB_PORT` and update `APP_URL`. The original dev machine uses 8002 / 3308.
 
-**Commands:** all artisan, composer and test commands run inside the container via `docker compose exec app ...`, never on the host.
+**Commands:** `Makefile` is the entry point (`make help` lists targets). All artisan, composer and test commands run inside the container via `docker compose exec app ...`, never on the host.
 
 ## Key directories
 
