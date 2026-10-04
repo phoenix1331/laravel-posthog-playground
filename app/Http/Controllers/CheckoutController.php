@@ -20,7 +20,7 @@ class CheckoutController extends Controller
     {
         $basket = $currentBasket->get();
 
-        if ($currentBasket->startCheckout($basket)) {
+        if ($currentBasket->startCheckout($basket, $request->user())) {
             CheckoutStarted::dispatch($basket, $request->user());
         }
 

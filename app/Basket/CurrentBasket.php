@@ -7,6 +7,7 @@ namespace App\Basket;
 use App\Models\Basket;
 use App\Models\TicketAllocation;
 use App\Models\TravelOption;
+use App\Models\User;
 use Illuminate\Contracts\Session\Session;
 
 /**
@@ -69,13 +70,13 @@ class CurrentBasket
      * Marks the basket as having reached checkout. Returns true only the
      * first time, so reloading the checkout page is not a new start.
      */
-    public function startCheckout(Basket $basket): bool
+    public function startCheckout(Basket $basket, User $user): bool
     {
         if ($basket->checkout_started_at !== null) {
             return false;
         }
 
-        $basket->forceFill(['checkout_started_at' => now()])->save();
+        $basket->forceFill(['checkout_started_at' => now(), 'user_id' => $user->id])->save();
 
         return true;
     }

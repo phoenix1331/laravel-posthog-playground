@@ -35,6 +35,16 @@ services:
       timeout: 5s
       retries: 3
 
+  scheduler:
+    <<: *app
+    command: ["php", "artisan", "schedule:work"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qa 'schedule:work' /proc/1/cmdline"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
   mysql:
     image: mysql:8.4
     environment:

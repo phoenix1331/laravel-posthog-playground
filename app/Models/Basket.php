@@ -6,6 +6,8 @@ namespace App\Models;
 
 use Database\Factories\BasketFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,13 +18,27 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * held in the session payload so idle baskets can be queried; updated_at
  * doubles as last activity.
  */
-#[Fillable(['fixture_id', 'ticket_allocation_id', 'quantity', 'travel_option_id', 'checkout_started_at'])]
+#[Fillable(['user_id', 'fixture_id', 'ticket_allocation_id', 'quantity', 'travel_option_id', 'checkout_started_at', 'abandoned_at'])]
 class Basket extends Model
 {
     /** @use HasFactory<BasketFactory> */
     use HasFactory, HasUuids;
 
     public const int MAX_TICKETS = 6;
+
+    /**
+     * Minutes of inactivity after reaching checkout before a basket counts
+     * as abandoned.
+     */
+    public const int ABANDON_AFTER_MINUTES = 30;
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /**
      * @return BelongsTo<Fixture, $this>
@@ -46,6 +62,21 @@ class Basket extends Model
     public function travelOption(): BelongsTo
     {
         return $this->belongsTo(TravelOption::class);
+    }
+
+    /**
+     * Reached checkout, idle past the threshold, not yet flagged. Purchased
+     * baskets are deleted, so they never match.
+     *
+     * @param  Builder<Basket>  $query
+     */
+    #[Scope]
+    protected function abandonable(Builder $query): void
+    {
+        $query->whereNotNull('checkout_started_at')
+            ->whereNotNull('user_id')
+            ->whereNull('abandoned_at')
+            ->where('updated_at', '<=', now()->subMinutes(self::ABANDON_AFTER_MINUTES));
     }
 
     public function ticketTotalPence(): int
@@ -72,6 +103,7 @@ class Basket extends Model
         return [
             'quantity' => 'integer',
             'checkout_started_at' => 'datetime',
+            'abandoned_at' => 'datetime',
         ];
     }
 }

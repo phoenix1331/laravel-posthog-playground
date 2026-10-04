@@ -8,6 +8,7 @@ use App\Analytics\Analytics;
 use App\Analytics\DistinctId;
 use App\Analytics\EventProperties;
 use App\Analytics\Events;
+use App\Events\CheckoutAbandoned;
 use App\Events\CheckoutStarted;
 use App\Events\FixtureViewed;
 use App\Events\SeatSelected;
@@ -67,6 +68,12 @@ class AnalyticsEventSubscriber
             ->booking($event->booking), $event);
     }
 
+    public function onCheckoutAbandoned(CheckoutAbandoned $event): void
+    {
+        $this->capture($event->user, Events::CHECKOUT_ABANDONED, EventProperties::make($event->occurredAt)
+            ->basket($event->basket), $event);
+    }
+
     /**
      * @return array<class-string, string>
      */
@@ -78,6 +85,7 @@ class AnalyticsEventSubscriber
             TravelAdded::class => 'onTravelAdded',
             CheckoutStarted::class => 'onCheckoutStarted',
             TicketPurchased::class => 'onTicketPurchased',
+            CheckoutAbandoned::class => 'onCheckoutAbandoned',
         ];
     }
 

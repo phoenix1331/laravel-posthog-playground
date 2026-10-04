@@ -18,6 +18,7 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 |---|---|---|---|
 | `app` | `Dockerfile` (`dunglas/frankenphp:php8.4`), Caddy serving `/app/public` on container port 8000 | `APP_PORT`, default 8000 | Healthcheck on `/up`; runs as UID/GID 1000 so bind-mounted files stay host-editable |
 | `queue` | Same image, `php artisan queue:work --queue=analytics,default --tries=3 --backoff=5` | none | Database queue driver; `analytics` queue (PostHog capture) drains before `default`; restart after code changes |
+| `scheduler` | Same image, `php artisan schedule:work` | none | Runs `routes/console.php` schedule; restart after code changes (`make queue-restart` restarts both) |
 | `mysql` | `mysql:8.4`, named volume `mysql-data` | `FORWARD_DB_PORT`, default 3306 | Container-internal `DB_HOST=mysql`, `DB_PORT=3306` |
 
 **Ports:** defaults are app 8000 and MySQL 3306. If a default is taken on the host, bump it (8001, 8002... / 3307, 3308...) in `.env` via `APP_PORT` / `FORWARD_DB_PORT` and update `APP_URL`. The original dev machine uses 8002 / 3308.
@@ -38,7 +39,7 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 | `Fixture` | `fixtures` | Home and away club, competition, `kicks_off_at`; routed by `slug`; `upcoming()` scope |
 | `TicketAllocation` | `ticket_allocations` | Stock per fixture per stand (`capacity`, `sold`); near sell-out at 90% |
 | `TravelOption` | `travel_options` | Coach to an away fixture with its own capacity |
-| `Basket` | `baskets` | UUID key; in-progress selection for one fixture (allocation, quantity, optional coach); `updated_at` is last activity |
+| `Basket` | `baskets` | UUID key; in-progress selection for one fixture (allocation, quantity, optional coach); `updated_at` is last activity; `user_id` and `checkout_started_at` set on first checkout visit; `abandoned_at` set by the abandonment sweep |
 | `Booking` | `bookings` | Purchase record with `reference`, quantity, ticket/travel/total in pence |
 
 Money is stored as integer pence. Seats are not modelled individually: stock per fixture per stand is enough for funnel and sell-out behaviour.
@@ -91,9 +92,11 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 | `TravelAdded` | `TravelController@store` | `travel_added` | user or anonymous |
 | `CheckoutStarted` | `CheckoutController@show`, first visit per basket only (`baskets.checkout_started_at`) | `checkout_started` | user |
 | `TicketPurchased` | `PlaceBooking`, after commit | `ticket_purchased` | booking's user |
+| `CheckoutAbandoned` | `DetectAbandonedCheckouts` job, every 5 minutes | `checkout_abandoned` | basket's user |
 
 - Every domain event carries `occurredAt` (default now; `TicketPurchased` uses `purchased_at`), passed through as the analytics timestamp so the simulator can backdate by dispatching the same events
 - `App\Listeners\AnalyticsEventSubscriber` is the single translation table, registered with `Event::subscribe()` in `AnalyticsServiceProvider::boot()`; methods are `on*` so listener auto-discovery does not register them twice; runs synchronously because delivery is already queued and the distinct ID needs the request session
+- Abandoned = `Basket::abandonable()`: checkout started, `user_id` set, `abandoned_at` null, `updated_at` at least `Basket::ABANDON_AFTER_MINUTES` (30) ago. A conditional `UPDATE ... WHERE abandoned_at IS NULL` claims each basket so overlapping sweeps cannot fire twice; `occurredAt` is last activity + 30 minutes. Only checkout-stage baskets qualify because the job has no session to recover an anonymous ID
 - `App\Analytics\DistinctId` (scoped per request): user ID when logged in, else a UUID v7 kept in the session under `analytics.anonymous_id`; `useAnonymousId()` overrides it outside HTTP (simulator)
 - Until identity stitching (alias on login) exists, anonymous and logged-in events are separate people, so the funnel breaks at login: the intended "before" picture
 
