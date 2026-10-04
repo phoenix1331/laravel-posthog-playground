@@ -76,6 +76,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Local logging
+    |--------------------------------------------------------------------------
+    |
+    | When analytics is not sending (no token, or disabled), name a log
+    | channel here to write every capture, identify, alias and group call to
+    | it instead of dropping them. Handy for watching events without an
+    | account, e.g. POSTHOG_LOG_CHANNEL=single.
+    |
+    */
+
+    'log_channel' => env('POSTHOG_LOG_CHANNEL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | SDK client options
     |--------------------------------------------------------------------------
     |

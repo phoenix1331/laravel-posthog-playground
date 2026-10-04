@@ -59,7 +59,20 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | `POSTHOG_QUEUE` | `queue` | `analytics` | Queue for server-side capture |
 | `POSTHOG_CONSUMER`, `POSTHOG_TIMEOUT_MS`, `POSTHOG_FLAG_TIMEOUT_MS`, `POSTHOG_DEBUG` | `client.*` | `lib_curl`, 3000, 1500, `false` | Passed to `PostHog\Client` |
 
+| `POSTHOG_LOG_CHANNEL` | `log_channel` | empty | When not sending, log every analytics call to this channel (e.g. `single`) instead of dropping it |
+
 `phpunit.xml` forces `POSTHOG_DISABLED=true` and empty keys, so the test suite can never send to PostHog.
+
+## Analytics contract
+
+| Class | Role |
+|---|---|
+| `App\Analytics\Analytics` | Interface: `capture()`, `identify()`, `alias()`, `groupIdentify()` |
+| `App\Analytics\NullAnalytics` | No token or disabled; drops calls, or logs them when `posthog.log_channel` is set |
+| `App\Analytics\FakeAnalytics` | Test double recording calls; `assertCaptured()`, `assertCapturedTimes()`, `assertNotCaptured()`, `assertNothingCaptured()`, `assertIdentified()`, `assertAliased()`, `assertGroupIdentified()` |
+| `App\Providers\AnalyticsServiceProvider` | Binds `Analytics` as a singleton; `sending()` is true only with a token and the kill switch off |
+
+Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return a `FakeAnalytics`.
 
 ## Event catalogue
 
