@@ -27,7 +27,7 @@ services:
 
   queue:
     <<: *app
-    command: ["php", "artisan", "queue:work", "--tries=3", "--backoff=5"]
+    command: ["php", "artisan", "queue:work", "--queue=analytics,default", "--tries=3", "--backoff=5"]
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "grep -qa 'queue:work' /proc/1/cmdline"]

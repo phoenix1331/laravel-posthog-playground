@@ -32,6 +32,9 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="POSTHOG_DISABLED" value="true"/>
+        <env name="POSTHOG_PROJECT_TOKEN" value=""/>
+        <env name="POSTHOG_PERSONAL_API_KEY" value=""/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

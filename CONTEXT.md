@@ -17,7 +17,7 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 | Service | Image / command | Host port | Notes |
 |---|---|---|---|
 | `app` | `Dockerfile` (`dunglas/frankenphp:php8.4`), Caddy serving `/app/public` on container port 8000 | `APP_PORT`, default 8000 | Healthcheck on `/up`; runs as UID/GID 1000 so bind-mounted files stay host-editable |
-| `queue` | Same image, `php artisan queue:work --tries=3 --backoff=5` | none | Database queue driver; restart after code changes to pick them up |
+| `queue` | Same image, `php artisan queue:work --queue=analytics,default --tries=3 --backoff=5` | none | Database queue driver; `analytics` queue (PostHog capture) drains before `default`; restart after code changes |
 | `mysql` | `mysql:8.4`, named volume `mysql-data` | `FORWARD_DB_PORT`, default 3306 | Container-internal `DB_HOST=mysql`, `DB_PORT=3306` |
 
 **Ports:** defaults are app 8000 and MySQL 3306. If a default is taken on the host, bump it (8001, 8002... / 3307, 3308...) in `.env` via `APP_PORT` / `FORWARD_DB_PORT` and update `APP_URL`. The original dev machine uses 8002 / 3308.
@@ -42,6 +42,24 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 | `Booking` | `bookings` | Purchase record with `reference`, quantity, ticket/travel/total in pence |
 
 Money is stored as integer pence. Seats are not modelled individually: stock per fixture per stand is enough for funnel and sell-out behaviour.
+
+## PostHog configuration
+
+`posthog/posthog-php` 4.x, configured in `config/posthog.php`. PostHog Cloud EU, free tier; self-hosting is out of scope.
+
+| Env key | Config key | Default | Purpose |
+|---|---|---|---|
+| `POSTHOG_DISABLED` | `disabled` | `false` | Kill switch; nothing is sent even with a token |
+| `POSTHOG_PROJECT_TOKEN` | `project_token` | empty | Public project key (`phc_...`); empty means the null analytics driver |
+| `POSTHOG_PERSONAL_API_KEY` | `secret_key` | empty | Personal (`phx_...`) or project secret (`phs_...`) key for local flag evaluation; server-side only |
+| `POSTHOG_HOST` | `host` | `https://eu.i.posthog.com` | Ingestion and API |
+| `POSTHOG_ASSETS_HOST` | `assets_host` | `https://eu-assets.i.posthog.com` | Static assets behind the proxy |
+| `POSTHOG_UI_HOST` | `ui_host` | `https://eu.posthog.com` | PostHog app links when proxied |
+| `POSTHOG_PROXY_PATH` | `proxy_path` | `ingest` | Reverse proxy path for client events |
+| `POSTHOG_QUEUE` | `queue` | `analytics` | Queue for server-side capture |
+| `POSTHOG_CONSUMER`, `POSTHOG_TIMEOUT_MS`, `POSTHOG_FLAG_TIMEOUT_MS`, `POSTHOG_DEBUG` | `client.*` | `lib_curl`, 3000, 1500, `false` | Passed to `PostHog\Client` |
+
+`phpunit.xml` forces `POSTHOG_DISABLED=true` and empty keys, so the test suite can never send to PostHog.
 
 ## Event catalogue
 
@@ -117,6 +135,8 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | Node on the host, not in the PHP image | Husky already needs host Node; keeps the FrankenPHP image lean |
 | Database queue driver, no Redis | Keeps the stack small; volume is low for a playground |
 | PostHog Cloud EU, free tier | Self-hosting is out of scope |
+| Dedicated `analytics` queue | Capture backlog never delays app jobs and can be monitored or scaled on its own |
+| SDK client built from config, not `PostHog::init()` | A container-bound instance is swappable in tests; the static facade also reads `POSTHOG_API_KEY` from the environment implicitly |
 | Skeleton `CLAUDE.md` / `AGENTS.md` removed | They instruct host-side PHP and Boost installs, which conflicts with container-only commands |
 
 ## Testing
