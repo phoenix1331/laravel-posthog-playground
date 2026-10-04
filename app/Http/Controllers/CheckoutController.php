@@ -8,16 +8,24 @@ use App\Basket\CurrentBasket;
 use App\Checkout\CheckoutFailed;
 use App\Checkout\FakePaymentGateway;
 use App\Checkout\PlaceBooking;
+use App\Events\CheckoutStarted;
 use App\Http\Requests\CheckoutRequest;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 
 class CheckoutController extends Controller
 {
-    public function show(CurrentBasket $basket): View
+    public function show(Request $request, CurrentBasket $currentBasket): View
     {
+        $basket = $currentBasket->get();
+
+        if ($currentBasket->startCheckout($basket)) {
+            CheckoutStarted::dispatch($basket, $request->user());
+        }
+
         return view('checkout.show', [
-            'basket' => $basket->get(),
+            'basket' => $basket,
             'testCard' => FakePaymentGateway::SUCCESS_CARD,
         ]);
     }

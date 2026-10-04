@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * held in the session payload so idle baskets can be queried; updated_at
  * doubles as last activity.
  */
-#[Fillable(['fixture_id', 'ticket_allocation_id', 'quantity', 'travel_option_id'])]
+#[Fillable(['fixture_id', 'ticket_allocation_id', 'quantity', 'travel_option_id', 'checkout_started_at'])]
 class Basket extends Model
 {
     /** @use HasFactory<BasketFactory> */
@@ -71,6 +71,7 @@ class Basket extends Model
     {
         return [
             'quantity' => 'integer',
+            'checkout_started_at' => 'datetime',
         ];
     }
 }

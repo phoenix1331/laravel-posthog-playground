@@ -78,6 +78,25 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 
 **Delivery rules:** event time is fixed when the call is made (queue lag never shifts it; simulator timestamps pass straight through); each message carries a UUID generated once, so a retried job is de-duplicated by PostHog; every job flushes because the client batches in memory and a long-running worker would otherwise hold events; `groupIdentify()` is sent as a `$groupidentify` capture because `PostHog\Client` has no such method.
 
+## Domain events to analytics
+
+```
+Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  Analytics::capture()  ->  queue  ->  PostHog
+```
+
+| Domain event | Dispatched from | Analytics event | Distinct ID |
+|---|---|---|---|
+| `FixtureViewed` | `FixtureController@show` | `fixture_viewed` | user or anonymous |
+| `SeatSelected` | `SeatSelectionController@store` | `seat_selected` | user or anonymous |
+| `TravelAdded` | `TravelController@store` | `travel_added` | user or anonymous |
+| `CheckoutStarted` | `CheckoutController@show`, first visit per basket only (`baskets.checkout_started_at`) | `checkout_started` | user |
+| `TicketPurchased` | `PlaceBooking`, after commit | `ticket_purchased` | booking's user |
+
+- Every domain event carries `occurredAt` (default now; `TicketPurchased` uses `purchased_at`), passed through as the analytics timestamp so the simulator can backdate by dispatching the same events
+- `App\Listeners\AnalyticsEventSubscriber` is the single translation table, registered with `Event::subscribe()` in `AnalyticsServiceProvider::boot()`; methods are `on*` so listener auto-discovery does not register them twice; runs synchronously because delivery is already queued and the distinct ID needs the request session
+- `App\Analytics\DistinctId` (scoped per request): user ID when logged in, else a UUID v7 kept in the session under `analytics.anonymous_id`; `useAnonymousId()` overrides it outside HTTP (simulator)
+- Until identity stitching (alias on login) exists, anonymous and logged-in events are separate people, so the funnel breaks at login: the intended "before" picture
+
 ## Event catalogue
 
 Names live in `App\Analytics\Events` (snake_case, past tense); properties are built with `App\Analytics\EventProperties`.
@@ -182,5 +201,6 @@ Husky-managed, tracked in `.husky/`, installed by `npm install` (`prepare` scrip
 - The image pre-creates `/config/psysh` owned by `app` so `php artisan tinker` works as the non-root user
 - Test cards: `4242 4242 4242 4242` succeeds, `4000 0000 0000 0002` is declined; card numbers are never stored
 - SQLite ignores `lockForUpdate()`, so locking is only exercised against MySQL, not in the test suite
+- `CurrentBasket::selectSeats()` calls `unsetRelations()` after changing the selection; otherwise listeners would read the previously loaded stand
 - Login and registration call `session()->regenerate()`, which keeps session data: the basket survives authentication, and so will the anonymous analytics ID
 - `.env` is not copied into the image (`.dockerignore`); it is read from the bind mount

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Analytics\Analytics;
+use App\Analytics\DistinctId;
 use App\Analytics\NullAnalytics;
 use App\Analytics\PostHogAnalytics;
+use App\Listeners\AnalyticsEventSubscriber;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 use PostHog\Client;
@@ -31,6 +34,14 @@ class AnalyticsServiceProvider extends ServiceProvider
             options: ['host' => config('posthog.host'), ...config('posthog.client')],
             loadFeatureFlags: false,
         ));
+
+        // Per request: the anonymous ID lives in that request's session
+        $this->app->scoped(DistinctId::class);
+    }
+
+    public function boot(): void
+    {
+        Event::subscribe(AnalyticsEventSubscriber::class);
     }
 
     /**

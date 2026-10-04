@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Events\FixtureViewed;
 use App\Models\Fixture;
 use App\Models\TicketAllocation;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
 
 class FixtureController extends Controller
 {
@@ -20,9 +22,11 @@ class FixtureController extends Controller
         return view('fixtures.index', ['fixturesByDate' => $fixtures]);
     }
 
-    public function show(Fixture $fixture): View
+    public function show(Request $request, Fixture $fixture): View
     {
         $fixture->load(['competition', 'homeClub', 'awayClub', 'ticketAllocations.stand', 'travelOptions']);
+
+        FixtureViewed::dispatch($fixture, $request->user());
 
         $allocations = $fixture->ticketAllocations
             ->sortByDesc(fn (TicketAllocation $allocation) => $allocation->stand->price_pence)

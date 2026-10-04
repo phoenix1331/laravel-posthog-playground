@@ -58,6 +58,16 @@ final class FakeAnalytics implements Analytics
     }
 
     /**
+     * Names of every captured event, in the order they were captured.
+     *
+     * @return list<string>
+     */
+    public function capturedEvents(): array
+    {
+        return array_column($this->captured, 'event');
+    }
+
+    /**
      * Captured calls for one event, optionally filtered.
      *
      * @param  (callable(array{distinct_id: string, event: string, properties: array<string, scalar>, groups: array<string, string>, timestamp: CarbonInterface|null}): bool)|null  $callback

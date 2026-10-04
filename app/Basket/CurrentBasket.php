@@ -47,7 +47,8 @@ class CurrentBasket
 
         $this->session->put(self::SESSION_KEY, $basket->id);
 
-        return $basket;
+        // Relations loaded before the change would describe the old selection
+        return $basket->unsetRelations();
     }
 
     public function addTravel(Basket $basket, TravelOption $travelOption): Basket
@@ -62,6 +63,21 @@ class CurrentBasket
         $basket->travelOption()->dissociate()->save();
 
         return $basket;
+    }
+
+    /**
+     * Marks the basket as having reached checkout. Returns true only the
+     * first time, so reloading the checkout page is not a new start.
+     */
+    public function startCheckout(Basket $basket): bool
+    {
+        if ($basket->checkout_started_at !== null) {
+            return false;
+        }
+
+        $basket->forceFill(['checkout_started_at' => now()])->save();
+
+        return true;
     }
 
     public function forget(): void
