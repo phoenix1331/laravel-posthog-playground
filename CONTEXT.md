@@ -43,6 +43,31 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 
 Money is stored as integer pence. Seats are not modelled individually: stock per fixture per stand is enough for funnel and sell-out behaviour.
 
+## Event catalogue
+
+Names live in `App\Analytics\Events` (snake_case, past tense); properties are built with `App\Analytics\EventProperties`.
+
+| Event | Source | Properties |
+|---|---|---|
+| `$pageview` | Client (posthog-js) | Automatic |
+| `fixture_viewed` | Server | fixture |
+| `seat_selected` | Server | fixture, seats |
+| `travel_added` | Server | basket |
+| `checkout_started` | Server | basket |
+| `ticket_purchased` | Server, from `TicketPurchased` | booking (includes `revenue` in pounds and `currency`) |
+| `checkout_abandoned` | Server, scheduled job | basket |
+
+| Builder method | Keys |
+|---|---|
+| `fixture()` | `fixture_id`, `fixture` (slug), `competition`, `home_club`, `away_club` (slugs), `kicks_off_at`, `days_until_kick_off` |
+| `seats()` | `stand`, `price_band`, `supporter_side` (`home`/`away` from the stand), `unit_price_pence`, `quantity`, `tickets_remaining`, `near_sell_out` |
+| `travel()` | `has_travel`, `travel_price_pence` |
+| `basket()` | fixture + seats + travel + `ticket_total_pence`, `travel_total_pence`, `total_pence` |
+| `booking()` | basket keys + `booking_reference`, `revenue`, `currency` |
+| `supportersClub()` | `supporters_club` (slug) |
+
+**Personal data:** `with()` rejects any key not in `EventProperties::ALLOWED`, so names, emails and card details cannot reach an event; the only identifier sent is the distinct ID. Null values are dropped. `make($at)` takes the event time so backdated simulator events get correct relative values.
+
 ## Seed data
 
 `DatabaseSeeder` calls `ClubSeeder`, `CompetitionSeeder`, `SupportersClubSeeder`, `UserSeeder`, `FixtureSeeder`. Data is fixed (no Faker), every seeder upserts on a natural key so re-seeding is safe, and `WithoutModelEvents` keeps seeding from firing domain events.
@@ -66,6 +91,7 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | `resources/` | Blade views, JS and CSS built by Vite |
 | `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page, `POST /fixtures/{slug}/seats`, `/basket`, `POST`/`DELETE /basket/travel`, `/checkout` (auth), `/bookings/{reference}` (owner only) |
 | `app/Checkout/` | `PlaceBooking` (locks stock, charges, books, dispatches `TicketPurchased`), `FakePaymentGateway`, `CheckoutFailed` |
+| `app/Analytics/` | Event catalogue (`Events`) and allow-listed property builder (`EventProperties`) |
 | `app/Events/` | Domain events (`TicketPurchased`, dispatched after commit) |
 | `app/Basket/CurrentBasket.php` | Session-scoped access to the visitor's basket (select seats, add/remove travel) |
 | `app/Http/Requests/` | Form requests holding stock, ownership and auth validation |
