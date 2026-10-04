@@ -19,9 +19,19 @@
                     <span class="inline-block size-3 rounded-full bg-floodlight"></span>
                     Matchday
                 </a>
-                <nav class="flex gap-4 text-sm text-pitch-100">
+                <nav class="flex items-center gap-4 text-sm text-pitch-100">
                     <a href="{{ route('fixtures.index') }}" class="hover:text-white">Fixtures</a>
                     <a href="{{ route('basket.show') }}" class="hover:text-white">Basket</a>
+                    @auth
+                        <span class="text-white">{{ auth()->user()->name }}</span>
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="hover:text-white">Log out</button>
+                        </form>
+                    @endauth
+                    @guest
+                        <a href="{{ route('login') }}" class="hover:text-white">Log in</a>
+                    @endguest
                 </nav>
             </div>
         </header>

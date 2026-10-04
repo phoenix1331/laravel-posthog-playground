@@ -66,7 +66,9 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | `resources/` | Blade views, JS and CSS built by Vite |
 | `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page, `POST /fixtures/{slug}/seats`, `/basket`, `POST`/`DELETE /basket/travel` |
 | `app/Basket/CurrentBasket.php` | Session-scoped access to the visitor's basket (select seats, add/remove travel) |
-| `app/Http/Requests/` | Form requests holding stock and ownership validation |
+| `app/Http/Requests/` | Form requests holding stock, ownership and auth validation |
+| `app/Http/Controllers/Auth/` | Hand-rolled login, registration and logout; redirect to intended URL, else basket, else fixtures |
+| `resources/views/components/form/field.blade.php` | Labelled input with old value and error message |
 | `request.http` | Example requests; `@baseUrl` defaults to port 8000, POSTs need `@csrfToken` from the page |
 | `resources/views/components/layouts/app.blade.php` | Anonymous layout component (`<x-layouts.app>`) |
 | `app/Support/` | Small helpers (`Money::format()` for pence to pounds) |
@@ -80,6 +82,7 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | Separate `queue` container | Capture runs off the request path; worker lifecycle is visible in `docker compose ps` |
 | In-memory SQLite for tests, MySQL for the app | Fast, isolated tests with no second MySQL database to provision; avoid MySQL-only SQL in app code |
 | Basket in a `baskets` table, only its ID in the session | The abandonment job must query idle baskets; serialised session payloads cannot be queried |
+| Hand-rolled auth, no starter kit | Keeps the login and registration seam visible for identity stitching (alias anonymous ID to user ID) |
 | Node on the host, not in the PHP image | Husky already needs host Node; keeps the FrankenPHP image lean |
 | Database queue driver, no Redis | Keeps the stack small; volume is low for a playground |
 | PostHog Cloud EU, free tier | Self-hosting is out of scope |
@@ -108,4 +111,5 @@ Husky-managed, tracked in `.husky/`, installed by `npm install` (`prepare` scrip
 
 - On a fresh clone the `queue` container restart-loops until the first `migrate` creates the `jobs` table; it recovers on its own afterwards
 - The image pre-creates `/config/psysh` owned by `app` so `php artisan tinker` works as the non-root user
+- Login and registration call `session()->regenerate()`, which keeps session data: the basket survives authentication, and so will the anonymous analytics ID
 - `.env` is not copied into the image (`.dockerignore`); it is read from the bind mount

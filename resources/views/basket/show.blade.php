@@ -35,6 +35,14 @@
                 <dd class="font-semibold">{{ $money($basket->totalPence()) }}</dd>
             </div>
         </dl>
+
+        @guest
+            <p class="mt-6 rounded-md bg-stone-100 px-4 py-3 text-sm text-stone-700">
+                <a href="{{ route('login') }}" class="font-medium text-pitch-700 hover:underline">Log in</a>
+                or <a href="{{ route('register') }}" class="font-medium text-pitch-700 hover:underline">create an account</a>
+                to check out. Your basket is kept.
+            </p>
+        @endguest
     </section>
 
     @if ($travelOptions->isNotEmpty() && $basket->travelOption === null)

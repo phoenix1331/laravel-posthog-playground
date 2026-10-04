@@ -59,3 +59,33 @@ POST {{baseUrl}}/basket/travel
 Content-Type: application/x-www-form-urlencoded
 
 _token={{csrfToken}}&_method=DELETE
+
+### Auth
+
+# Login page
+GET {{baseUrl}}/login
+Accept: text/html
+
+###
+
+# Log in as a seeded supporter (all seeded passwords are "password"); returns to the basket if one exists
+POST {{baseUrl}}/login
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}&email=alex.morgan@matchday.test&password=password
+
+###
+
+# Register a new supporter, optionally joining a supporters' club (1-4 when seeded)
+POST {{baseUrl}}/register
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}&name=Test+Supporter&email=test.supporter@example.com&password=a-strong-password&password_confirmation=a-strong-password&supporters_club_id=1
+
+###
+
+# Log out
+POST {{baseUrl}}/logout
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}
