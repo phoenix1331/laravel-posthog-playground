@@ -1,0 +1,61 @@
+# Matchday HTTP requests (VS Code REST Client and JetBrains HTTP Client)
+#
+# Default app port is 8000. If it was taken and you bumped APP_PORT in .env
+# (e.g. 8002), change @baseUrl to match.
+#
+# POST/DELETE routes are web routes protected by CSRF. Both clients keep the
+# session cookie between requests, so: run "Fixture page" first, copy the
+# value of <meta name="csrf-token"> from the response into @csrfToken, then
+# run the basket requests in order.
+
+@baseUrl = http://localhost:8000
+@fixture = harbour-city-v-millbrook-rovers-premier-division
+@csrfToken = paste-token-here
+
+### Fixtures
+
+# Upcoming fixtures grouped by date, with from-prices and "selling fast" flags
+GET {{baseUrl}}/
+Accept: text/html
+
+###
+
+# Fixture page: stands, prices, availability and away coaches; starts the session
+GET {{baseUrl}}/fixtures/{{fixture}}
+Accept: text/html
+
+###
+
+# Unknown fixture slug returns 404
+GET {{baseUrl}}/fixtures/no-such-match
+Accept: text/html
+
+### Basket
+
+# Select tickets in a stand (ticket_allocation_id from the fixture page form); redirects to /basket
+POST {{baseUrl}}/fixtures/{{fixture}}/seats
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}&ticket_allocation_id=1&quantity=2
+
+###
+
+# Basket summary with ticket, travel and total prices; redirects to / when empty
+GET {{baseUrl}}/basket
+Accept: text/html
+
+###
+
+# Add a coach seat per ticket (travel_option_id must belong to the basket's fixture)
+POST {{baseUrl}}/basket/travel
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}&travel_option_id=1
+
+###
+
+# Remove the coach from the basket
+POST {{baseUrl}}/basket/travel
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}&_method=DELETE

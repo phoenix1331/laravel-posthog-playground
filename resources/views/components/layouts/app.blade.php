@@ -5,6 +5,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title>{{ $title ? "{$title} | " : '' }}{{ config('app.name') }}</title>
 
@@ -18,13 +19,18 @@
                     <span class="inline-block size-3 rounded-full bg-floodlight"></span>
                     Matchday
                 </a>
-                <nav class="text-sm text-pitch-100">
+                <nav class="flex gap-4 text-sm text-pitch-100">
                     <a href="{{ route('fixtures.index') }}" class="hover:text-white">Fixtures</a>
+                    <a href="{{ route('basket.show') }}" class="hover:text-white">Basket</a>
                 </nav>
             </div>
         </header>
 
         <main class="mx-auto max-w-5xl px-4 py-8">
+            @if (session('status'))
+                <p class="mb-6 rounded-md bg-pitch-50 px-4 py-3 text-sm text-pitch-900">{{ session('status') }}</p>
+            @endif
+
             {{ $slot }}
         </main>
 

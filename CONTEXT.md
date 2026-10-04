@@ -38,6 +38,7 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 | `Fixture` | `fixtures` | Home and away club, competition, `kicks_off_at`; routed by `slug`; `upcoming()` scope |
 | `TicketAllocation` | `ticket_allocations` | Stock per fixture per stand (`capacity`, `sold`); near sell-out at 90% |
 | `TravelOption` | `travel_options` | Coach to an away fixture with its own capacity |
+| `Basket` | `baskets` | UUID key; in-progress selection for one fixture (allocation, quantity, optional coach); `updated_at` is last activity |
 | `Booking` | `bookings` | Purchase record with `reference`, quantity, ticket/travel/total in pence |
 
 Money is stored as integer pence. Seats are not modelled individually: stock per fixture per stand is enough for funnel and sell-out behaviour.
@@ -63,7 +64,10 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | `app/Enums/` | Backed enums (`PriceBand`) |
 | `database/` | Migrations, factories, seeders |
 | `resources/` | Blade views, JS and CSS built by Vite |
-| `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page |
+| `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page, `POST /fixtures/{slug}/seats`, `/basket`, `POST`/`DELETE /basket/travel` |
+| `app/Basket/CurrentBasket.php` | Session-scoped access to the visitor's basket (select seats, add/remove travel) |
+| `app/Http/Requests/` | Form requests holding stock and ownership validation |
+| `request.http` | Example requests; `@baseUrl` defaults to port 8000, POSTs need `@csrfToken` from the page |
 | `resources/views/components/layouts/app.blade.php` | Anonymous layout component (`<x-layouts.app>`) |
 | `app/Support/` | Small helpers (`Money::format()` for pence to pounds) |
 | `tests/` | Pest suites: `Unit` (no framework), `Feature` (full app via `tests/Pest.php`), `Arch` (`tests/ArchTest.php`) |
@@ -75,6 +79,7 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | MySQL + Docker/FrankenPHP instead of the brief's SQLite + Herd | Project default stack; reproducible on any machine, closer to production |
 | Separate `queue` container | Capture runs off the request path; worker lifecycle is visible in `docker compose ps` |
 | In-memory SQLite for tests, MySQL for the app | Fast, isolated tests with no second MySQL database to provision; avoid MySQL-only SQL in app code |
+| Basket in a `baskets` table, only its ID in the session | The abandonment job must query idle baskets; serialised session payloads cannot be queried |
 | Node on the host, not in the PHP image | Husky already needs host Node; keeps the FrankenPHP image lean |
 | Database queue driver, no Redis | Keeps the stack small; volume is low for a playground |
 | PostHog Cloud EU, free tier | Self-hosting is out of scope |
