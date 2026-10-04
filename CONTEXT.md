@@ -32,7 +32,7 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 | `database/` | Migrations, factories, seeders |
 | `resources/` | Blade views, JS and CSS built by Vite |
 | `routes/web.php` | Web routes |
-| `tests/` | Test suite |
+| `tests/` | Pest suites: `Unit` (no framework), `Feature` (full app via `tests/Pest.php`), `Arch` (`tests/ArchTest.php`) |
 
 ## Decisions
 
@@ -40,9 +40,20 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 |---|---|
 | MySQL + Docker/FrankenPHP instead of the brief's SQLite + Herd | Project default stack; reproducible on any machine, closer to production |
 | Separate `queue` container | Capture runs off the request path; worker lifecycle is visible in `docker compose ps` |
+| In-memory SQLite for tests, MySQL for the app | Fast, isolated tests with no second MySQL database to provision; avoid MySQL-only SQL in app code |
 | Database queue driver, no Redis | Keeps the stack small; volume is low for a playground |
 | PostHog Cloud EU, free tier | Self-hosting is out of scope |
 | Skeleton `CLAUDE.md` / `AGENTS.md` removed | They instruct host-side PHP and Boost installs, which conflicts with container-only commands |
+
+## Testing
+
+| Item | Detail |
+|---|---|
+| Framework | Pest 5 with `pestphp/pest-plugin-laravel`; run via `make test` |
+| Database | In-memory SQLite (`phpunit.xml`), queue `sync`, cache and session `array` |
+| Arch rules | Pest `php` and `security` presets, no `dd`/`dump`/`ray`, `App` uses strict types |
+
+Pest's `php` preset does not cover `dd`/`dump`; those are asserted explicitly rather than adopting the stricter `laravel` preset.
 
 ## Git hooks
 
