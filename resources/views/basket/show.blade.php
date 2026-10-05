@@ -37,7 +37,7 @@
         </dl>
 
         @auth
-            <a href="{{ route('checkout.show') }}" class="mt-6 inline-block rounded-md bg-pitch-600 px-4 py-2 text-sm font-medium text-white hover:bg-pitch-700">
+            <a href="{{ route('checkout.show') }}" dusk="continue-to-checkout" class="mt-6 inline-block rounded-md bg-pitch-600 px-4 py-2 text-sm font-medium text-white hover:bg-pitch-700">
                 Continue to checkout
             </a>
         @endauth
@@ -75,7 +75,7 @@
                                 <form method="POST" action="{{ route('travel.store') }}">
                                     @csrf
                                     <input type="hidden" name="travel_option_id" value="{{ $travelOption->id }}">
-                                    <button type="submit" class="rounded-md bg-pitch-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pitch-700">Add</button>
+                                    <button type="submit" dusk="add-coach" class="rounded-md bg-pitch-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pitch-700">Add</button>
                                 </form>
                             @else
                                 <span class="text-xs text-red-700">Not enough seats</span>

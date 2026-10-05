@@ -45,6 +45,24 @@ services:
       timeout: 5s
       retries: 3
 
+  # Selenium for Dusk; only runs with `make dusk` (profile "dusk").
+  # Shares the app container's network, so the browser reaches the app as
+  # http://localhost:8000: Chrome never upgrades localhost to HTTPS, and it is
+  # a secure context for browser APIs
+  browser:
+    image: selenium/standalone-chromium:latest
+    profiles: ["dusk"]
+    network_mode: "service:app"
+    depends_on:
+      app:
+        condition: service_healthy
+    shm_size: 2gb
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4444/status | grep -q '\"ready\": true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   mysql:
     image: mysql:8.4
     environment:

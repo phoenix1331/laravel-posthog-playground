@@ -16,7 +16,7 @@
                 Remember me
             </label>
 
-            <button type="submit" class="w-full rounded-md bg-pitch-600 px-4 py-2 text-sm font-medium text-white hover:bg-pitch-700">Log in</button>
+            <button type="submit" dusk="log-in" class="w-full rounded-md bg-pitch-600 px-4 py-2 text-sm font-medium text-white hover:bg-pitch-700">Log in</button>
         </form>
     </div>
 </x-layouts.app>

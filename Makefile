@@ -2,7 +2,7 @@
 
 EXEC = docker compose exec app
 
-.PHONY: help up down build restart shell migrate seed fresh test test-js logs queue-logs queue-restart scheduler-logs schedule-list simulate simulate-unstitched sync-groups assets vite
+.PHONY: help up down build restart shell migrate seed fresh test test-js dusk logs queue-logs queue-restart scheduler-logs schedule-list simulate simulate-unstitched sync-groups assets vite
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -36,6 +36,10 @@ test: ## Run the test suite
 
 test-js: ## Run JavaScript unit tests with node --test (runs on the host)
 	@npm test
+
+dusk: ## Drive real browser sessions through the funnel (starts selenium; replays when PostHog is configured)
+	@docker compose --profile dusk up -d --wait browser
+	@$(EXEC) php artisan dusk
 
 logs: ## Tail app container logs
 	@docker compose logs -f app

@@ -46,6 +46,6 @@
                 <option value="{{ $quantity }}" @selected(old('quantity') == $quantity)>{{ $quantity }}</option>
             @endforeach
         </select>
-        <button type="submit" class="rounded-md bg-pitch-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pitch-700">Select seats</button>
+        <button type="submit" dusk="select-seats" class="rounded-md bg-pitch-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pitch-700">Select seats</button>
     </div>
 </form>

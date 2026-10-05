@@ -35,7 +35,7 @@
                                 <option value="{{ $quantity }}">{{ $quantity }}</option>
                             @endforeach
                         </select>
-                        <button type="submit" class="rounded-md bg-pitch-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pitch-700">Select</button>
+                        <button type="submit" dusk="select-seats" class="rounded-md bg-pitch-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pitch-700">Select</button>
                     </form>
                 @endunless
             </div>

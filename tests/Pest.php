@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Analytics\Analytics;
 use App\Analytics\FakeAnalytics;
+use Tests\DuskTestCase;
 use Tests\TestCase;
 
 /*
@@ -17,6 +18,9 @@ use Tests\TestCase;
 */
 
 pest()->extend(TestCase::class)->in('Feature');
+
+// Browser scripts run with `make dusk` against the live app, never with `make test`
+pest()->extend(DuskTestCase::class)->in('Browser');
 
 /*
 |--------------------------------------------------------------------------

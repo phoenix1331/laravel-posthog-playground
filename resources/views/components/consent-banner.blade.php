@@ -7,7 +7,7 @@
         </p>
         <div class="flex shrink-0 gap-2">
             <button type="button" data-consent="denied" class="rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-50">Decline</button>
-            <button type="button" data-consent="granted" class="rounded-md bg-pitch-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pitch-700">Accept</button>
+            <button type="button" dusk="consent-accept" data-consent="granted" class="rounded-md bg-pitch-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-pitch-700">Accept</button>
         </div>
     </div>
 </div>

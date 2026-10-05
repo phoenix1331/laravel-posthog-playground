@@ -12,7 +12,7 @@
                 @foreach ($fixtures as $fixture)
                     @php($fromPrice = $fixture->cheapestAvailablePricePence())
                     <li>
-                        <a href="{{ route('fixtures.show', $fixture) }}"
+                        <a href="{{ route('fixtures.show', $fixture) }}" dusk="fixture-card"
                            class="block rounded-lg border border-stone-200 bg-white p-4 shadow-sm transition hover:border-pitch-600 hover:shadow">
                             <div class="flex items-center justify-between text-xs text-stone-500">
                                 <span>{{ $fixture->competition->name }}</span>

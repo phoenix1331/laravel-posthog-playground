@@ -7,7 +7,7 @@
     };
 @endphp
 
-<label class="{{ $position }} block {{ $soldOut ? 'cursor-not-allowed' : 'cursor-pointer' }}">
+<label dusk="map-stand" @if ($allocation->isSoldOut()) data-sold-out @endif class="{{ $position }} block {{ $soldOut ? 'cursor-not-allowed' : 'cursor-pointer' }}">
     <input type="radio" name="ticket_allocation_id" value="{{ $allocation->id }}" class="peer sr-only"
            @disabled($soldOut) @checked(old('ticket_allocation_id') == $allocation->id) required>
     <span class="flex h-full flex-col justify-center rounded-md border p-3 text-center text-sm transition {{ $tone }}">

@@ -19,6 +19,7 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 | `app` | `Dockerfile` (`dunglas/frankenphp:php8.4`), Caddy serving `/app/public` on container port 8000 | `APP_PORT`, default 8000 | Healthcheck on `/up`; runs as UID/GID 1000 so bind-mounted files stay host-editable |
 | `queue` | Same image, `php artisan queue:work --queue=analytics,default --tries=3 --backoff=5` | none | Database queue driver; `analytics` queue (PostHog capture) drains before `default`; restart after code changes |
 | `scheduler` | Same image, `php artisan schedule:work` | none | Runs `routes/console.php` schedule; restart after code changes (`make queue-restart` restarts both) |
+| `browser` | `selenium/standalone-chromium`, Compose profile `dusk` (only `make dusk` starts it) | none | `network_mode: service:app`: shares the app container's network, so Dusk reaches Selenium at `localhost:4444` and Chromium reaches the app at `localhost:8000` |
 | `mysql` | `mysql:8.4`, named volume `mysql-data` | `FORWARD_DB_PORT`, default 3306 | Container-internal `DB_HOST=mysql`, `DB_PORT=3306` |
 
 **Ports:** defaults are app 8000 and MySQL 3306. If a default is taken on the host, bump it (8001, 8002... / 3307, 3308...) in `.env` via `APP_PORT` / `FORWARD_DB_PORT` and update `APP_URL`. The original dev machine uses 8002 / 3308.
@@ -302,6 +303,24 @@ Pest's `php` preset does not cover `dd`/`dump`; those are asserted explicitly ra
 
 Each rule was checked by planting a violation and confirming it fails. Pest 5.3 gotcha: with several targets in one `expect([...])`, `not->toUse()` missed violations outside the first target, so the domain rule loops one namespace at a time.
 
+## Browser journeys (Dusk)
+
+`laravel/dusk` with Pest; scripts in `tests/Browser/SupporterJourneysTest.php`, run with `make dusk` (starts `browser`, then `php artisan dusk` in `app`). They are not tests of a throwaway database: they browse the seeded MySQL app like real supporters, so with a PostHog token (and consent accepted in the banner) they produce client events and masked session replays.
+
+| Journey | Does |
+|---|---|
+| Browse | Opens the fixture list and two fixtures |
+| Buy | Picks seats with whichever picker the visitor gets (map or list), adds a coach when offered, logs in as a random seeded supporter, pays with the test card |
+| Abandon | Reaches checkout logged in, then leaves (the sweep flags it 30 minutes later) |
+| Declined card | Pays with `4000 0000 0000 0002` and stays on checkout |
+| Sold out | Confirms a sold-out stand is shown as sold out |
+
+- `phpunit.dusk.xml` has no environment overrides (unlike `phpunit.xml`), so scripts read the real MySQL data; `DUSK_APP_URL`/`DUSK_DRIVER_URL` default to `http://localhost:8000` and `http://localhost:4444`. No `.env.dusk.*` file: Dusk would swap `.env` under the running, bind-mounted app
+- `tests/DuskTestCase.php`: remote headless Chromium, no local ChromeDriver; selectors use `dusk="..."` attributes on key elements so variant copy (e.g. the checkout CTA) never breaks them
+- Each journey calls `asNewVisitor()` (clears cookies, `localStorage`, `sessionStorage`) because Dusk reuses one browser across tests; otherwise the next "visitor" is still logged in
+- Scripts make real bookings, so stock goes down slightly per run; `make fresh` resets everything
+- `make test` never runs them (`phpunit.xml` lists only `Unit`, `Feature`, `Arch`)
+
 ## Git hooks
 
 Husky-managed, tracked in `.husky/`, installed by `npm install` (`prepare` script). Hook bodies are POSIX `sh` because Husky ignores the shebang.
@@ -320,4 +339,7 @@ Husky-managed, tracked in `.husky/`, installed by `npm install` (`prepare` scrip
 - `CurrentBasket::selectSeats()` calls `unsetRelations()` after changing the selection; otherwise listeners would read the previously loaded stand
 - The proxy forwards `getRequestUri()` verbatim: route parameters drop trailing slashes and `getQueryString()` reorders keys. Laravel's test `call()` also trims trailing slashes, so the exact-path test goes through the HTTP kernel directly
 - Login and registration call `session()->regenerate()`, which keeps session data: the basket survives authentication, and so will the anonymous analytics ID
+- Recent Chrome upgrades `http://app:8000` to HTTPS (`ERR_SSL_PROTOCOL_ERROR`); sharing the app's network so the browser uses `localhost` avoids it and gives a secure context
+- `php artisan dusk:install` prepends a `pest()->extend()` block above `declare(strict_types=1)` in `tests/Pest.php`, which is a fatal error; the extend line lives below the declare instead
+- The Selenium service was renamed from `selenium` to `browser` after Docker on WSL left a `selenium` container that could not be killed; any orphan of it is harmless and goes on the next Docker restart
 - `.env` is not copied into the image (`.dockerignore`); it is read from the bind mount
