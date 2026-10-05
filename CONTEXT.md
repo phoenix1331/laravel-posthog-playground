@@ -88,6 +88,8 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 | `PostHogFeatureDriver` | Pennant driver (`Driver`, `DefinesFeaturesExternally`). Returns PostHog's value (`false`, `true` or a variant key); app `Feature::define()` resolvers are fallbacks when not sending or PostHog lacks the flag (they always receive a `FlagScope`); records `$feature_flag_called` once per person, flag and value per `exposure_ttl` through the queued `Analytics` contract; `activate`/`forget`/`purge` throw `LogicException` because PostHog owns rollout |
 | `FlagScope` | Pennant scope: distinct ID + groups + person properties. Default scope (`Feature::resolveScopeUsing`) is `FlagScope::current()`, so anonymous visitors get flags too and keep them after login. `from()` accepts a `FlagScope`, `User`, distinct ID string or null |
 | `PostHogFlags` (scoped per request) | Calls `Client::getAllFlags()` once per distinct ID per request, records timings (`mode`, `milliseconds`, `flags`), swallows and reports errors (empty result, so fallbacks apply). Its client is built lazily on first use |
+| `FlagClientFactory` | Builds flag clients: `local()` (secret key + `CachedFlagDefinitions`), `remote()` (no secret key), `forConfiguredMode()`; separate from the worker's capture client |
+| `FlagEvaluationBenchmark` | Runs the same scopes through both modes, timing client setup separately from per-visitor evaluation, and reports agreement and definitions cache state |
 | `CachedFlagDefinitions` | SDK `FlagDefinitionCacheProvider` on Laravel's cache (`posthog:flag-definitions`, `definitions_ttl`); one worker refreshes behind a 30 second lock |
 
 | Env key | Default | Purpose |
@@ -103,7 +105,8 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 
 - `App\Analytics\Flags\Rollout` reproduces PostHog's percentage bucketing (first 15 hex digits of `sha1("<key>.<distinct id>")` scaled to 0-1, included when at or below N/100), so fallbacks pick the same visitors PostHog would; a test checks it against the SDK's local evaluation for 400 IDs
 - Tests force a class feature with `Feature::define('<key>', true|false)`: `activateForEveryone()` only updates scopes already stored, not new visitors
-- Flag evaluation uses its own `PostHog\Client` (secret key + cache provider in local mode, no secret key in remote mode), separate from the capture client used by the worker
+- **Debug page** `GET /debug/flags?samples=N` (`auth` + `can:view-debug`, gate defined in `AppServiceProvider`: `is_admin`; "Debug" nav link for admins): local vs remote for the current visitor plus `debug-sample-*` IDs, with setup, min/mean/max and total timings, per-visitor values and agreement, cache warm/cold and `POST /debug/flags/clear-definitions`. Without a token it lists fallback values. `App\Http\Controllers\Debug` is the one namespace exempt from the controllers-never-touch-analytics arch rule, and is still barred from the PostHog SDK
+- `Feature::discover()` runs in `AnalyticsServiceProvider::boot()` after `Feature::extend()`: in `AppServiceProvider` it ran before the `posthog` driver existed and failed boot
 - `getAllFlags()` rather than `evaluateFlags()`: the latter sends `$feature_flag_called` through the SDK client inside the request, which breaks "capture stays out of the request path"
 - Without a definition cache, PHP's per-request lifecycle would download every definition on every request, making "local" slower than remote
 
@@ -219,7 +222,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `app/Http/Requests/` | Form requests holding stock, ownership and auth validation |
 | `app/Http/Controllers/Auth/` | Hand-rolled login, registration and logout; redirect to intended URL, else basket, else fixtures |
 | `resources/views/components/form/field.blade.php` | Labelled input with old value and error message |
-| `request.http` | Example requests; `@baseUrl` defaults to port 8000, POSTs need `@csrfToken` from the page |
+| `request.http` | Example requests (fixtures, basket, checkout, auth, ingest proxy, debug); `@baseUrl` defaults to port 8000, POSTs need `@csrfToken` from the page |
 | `resources/views/components/layouts/app.blade.php` | Anonymous layout component (`<x-layouts.app>`) |
 | `app/Support/` | Small helpers (`Money::format()` for pence to pounds) |
 | `tests/` | Pest suites: `Unit` (no framework), `Feature` (full app via `tests/Pest.php`), `Arch` (`tests/ArchTest.php`) |
@@ -260,7 +263,8 @@ Pest's `php` preset does not cover `dd`/`dump`; those are asserted explicitly ra
 
 | Rule | Enforces |
 |---|---|
-| `App\Http\Controllers` does not use `PostHog`, `App\Analytics` or `CaptureAnalyticsEvent` | Controllers never call PostHog (brief's definition of done) |
+| `App\Http\Controllers` (except `Debug`) does not use `PostHog`, `App\Analytics` or `CaptureAnalyticsEvent` | Controllers never call PostHog (brief's definition of done) |
+| `App\Http\Controllers\Debug` does not use `PostHog` | Debug pages go through the analytics layer, not the SDK |
 | `PostHog` only used in `App\Analytics`, `CaptureAnalyticsEvent`, `AnalyticsServiceProvider` | The SDK is contained |
 | `App\Analytics\Analytics` only used in `App\Analytics`, `AnalyticsEventSubscriber`, `AnalyticsServiceProvider`, `SyncAnalyticsGroups` | One translation table, plus the group sync command |
 | `App\Events`, `App\Models`, `App\Checkout`, `App\Basket` do not use `PostHog` or `App\Analytics` | Domain code fires events and nothing else |

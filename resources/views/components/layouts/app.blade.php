@@ -23,6 +23,9 @@
                 <nav class="flex items-center gap-4 text-sm text-pitch-100">
                     <a href="{{ route('fixtures.index') }}" class="hover:text-white">Fixtures</a>
                     <a href="{{ route('basket.show') }}" class="hover:text-white">Basket</a>
+                    @can('view-debug')
+                        <a href="{{ route('debug.flags') }}" class="hover:text-white">Debug</a>
+                    @endcan
                     @auth
                         <span class="text-white">{{ auth()->user()->name }}</span>
                         <form method="POST" action="{{ route('logout') }}">

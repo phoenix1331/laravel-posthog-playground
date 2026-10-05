@@ -28,9 +28,15 @@ arch('application code declares strict types')
 |
 */
 
+// Debug pages exist to inspect the analytics layer, so they are the one exemption
 arch('controllers never call PostHog or the analytics layer')
     ->expect('App\Http\Controllers')
-    ->not->toUse(['PostHog', 'App\Analytics', 'App\Jobs\CaptureAnalyticsEvent']);
+    ->not->toUse(['PostHog', 'App\Analytics', 'App\Jobs\CaptureAnalyticsEvent'])
+    ->ignoring('App\Http\Controllers\Debug');
+
+arch('debug controllers still never call the PostHog sdk directly')
+    ->expect('App\Http\Controllers\Debug')
+    ->not->toUse('PostHog');
 
 arch('the PostHog sdk is only used by the analytics layer')
     ->expect('PostHog')

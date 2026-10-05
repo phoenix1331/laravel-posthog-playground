@@ -130,3 +130,17 @@ POST {{baseUrl}}/ingest/e/?ip=0
 Content-Type: application/json
 
 {"api_key": "phc_your_token", "event": "proxy_test", "distinct_id": "request-http", "properties": {}}
+
+### Debug (log in as admin@matchday.test first)
+
+# Local vs remote flag evaluation with timings; samples 1-25 (default 10)
+GET {{baseUrl}}/debug/flags?samples=10
+Accept: text/html
+
+###
+
+# Clear the cached flag definitions so the next local run shows the cold-start cost
+POST {{baseUrl}}/debug/flags/clear-definitions
+Content-Type: application/x-www-form-urlencoded
+
+_token={{csrfToken}}

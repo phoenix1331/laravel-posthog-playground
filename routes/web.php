@@ -7,6 +7,7 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\BasketController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\Debug\FlagDebugController;
 use App\Http\Controllers\FixtureController;
 use App\Http\Controllers\SeatSelectionController;
 use App\Http\Controllers\TravelController;
@@ -35,6 +36,11 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/login', [LoginController::class, 'store'])->middleware('throttle:6,1');
     Route::get('/register', [RegisterController::class, 'create'])->name('register');
     Route::post('/register', [RegisterController::class, 'store'])->middleware('throttle:6,1');
+});
+
+Route::middleware(['auth', 'can:view-debug'])->prefix('debug')->name('debug.')->group(function (): void {
+    Route::get('/flags', [FlagDebugController::class, 'show'])->name('flags');
+    Route::post('/flags/clear-definitions', [FlagDebugController::class, 'clearDefinitions'])->name('flags.clear');
 });
 
 Route::post('/logout', [LoginController::class, 'destroy'])->middleware('auth')->name('logout');
