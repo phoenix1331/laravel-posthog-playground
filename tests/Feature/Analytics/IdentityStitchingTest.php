@@ -111,7 +111,7 @@ it('links the whole funnel to one person once aliased', function (): void {
     $this->analytics->assertAliased($buyerId, $anonymousId);
 });
 
-it('queues alias before identify for PostHog', function (): void {
+it('queues alias, then identify, then the supporters club group for PostHog', function (): void {
     Queue::fake();
     config(['posthog.disabled' => false, 'posthog.project_token' => 'phc_test']);
     app()->forgetInstance(Analytics::class);
@@ -119,6 +119,8 @@ it('queues alias before identify for PostHog', function (): void {
 
     logIn($this->user);
 
-    expect(Queue::pushed(CaptureAnalyticsEvent::class)->pluck('call')->all())
-        ->toBe([CaptureAnalyticsEvent::ALIAS, CaptureAnalyticsEvent::IDENTIFY]);
+    $jobs = Queue::pushed(CaptureAnalyticsEvent::class);
+
+    expect($jobs->pluck('call')->all())->toBe([CaptureAnalyticsEvent::ALIAS, CaptureAnalyticsEvent::IDENTIFY, CaptureAnalyticsEvent::CAPTURE])
+        ->and($jobs->last()->message['event'])->toBe('$groupidentify');
 });

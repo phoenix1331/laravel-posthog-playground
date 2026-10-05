@@ -8,6 +8,7 @@ use App\Analytics\Analytics;
 use App\Analytics\DistinctId;
 use App\Analytics\EventProperties;
 use App\Analytics\Events;
+use App\Analytics\Groups;
 use App\Analytics\PersonProperties;
 use App\Events\CheckoutAbandoned;
 use App\Events\CheckoutStarted;
@@ -81,6 +82,9 @@ class AnalyticsEventSubscriber
      * it they are their user ID. Aliasing tells PostHog both are one person,
      * so the browsing that led to a purchase stays attached to the buyer.
      *
+     * The supporter's club is refreshed as a group at the same time, so its
+     * name and member count stay current in PostHog.
+     *
      * Fires for password logins, Auth::login() after registration and
      * remember-me logins alike. When the anonymous ID already is the user ID
      * (the browser identified first) there is nothing to merge.
@@ -99,6 +103,12 @@ class AnalyticsEventSubscriber
         }
 
         $this->analytics->identify($userId, PersonProperties::for($event->user));
+
+        $supportersClub = $event->user->supportersClub;
+
+        if ($supportersClub !== null) {
+            $this->analytics->groupIdentify(Groups::SUPPORTERS_CLUB, $supportersClub->slug, Groups::properties($supportersClub));
+        }
     }
 
     /**
@@ -123,6 +133,7 @@ class AnalyticsEventSubscriber
             distinctId: $this->distinctId->for($user),
             event: $name,
             properties: $properties->supportersClub($user?->supportersClub)->toArray(),
+            groups: Groups::for($user),
             timestamp: $event->occurredAt,
         );
     }

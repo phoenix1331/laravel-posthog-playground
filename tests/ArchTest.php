@@ -46,6 +46,7 @@ arch('the analytics contract is only called from the subscriber and the analytic
         'App\Analytics',
         'App\Listeners\AnalyticsEventSubscriber',
         'App\Providers\AnalyticsServiceProvider',
+        'App\Console\Commands\SyncAnalyticsGroups',
     ]);
 
 // One rule per namespace: with several targets in one expect([...]),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\View\Components;
 
 use App\Analytics\DistinctId;
+use App\Analytics\Groups;
 use App\Analytics\PersonProperties;
 use App\Models\User;
 use App\Providers\AnalyticsServiceProvider;
@@ -62,7 +63,7 @@ class PosthogConfig extends Component
      * Who posthog-js should be identified as; null tells it to reset if it
      * is still identified from an earlier login.
      *
-     * @return array{distinctId: string, properties: array<string, scalar>}|null
+     * @return array{distinctId: string, properties: array<string, scalar>, groups: array<string, string>}|null
      */
     private function identity(): ?array
     {
@@ -73,6 +74,7 @@ class PosthogConfig extends Component
         return [
             'distinctId' => DistinctId::forUser($this->user),
             'properties' => PersonProperties::for($this->user),
+            'groups' => (object) Groups::for($this->user),
         ];
     }
 

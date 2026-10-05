@@ -43,6 +43,7 @@ it('tells posthog-js who is logged in, with the same person properties as the se
     expect($settings['identity'])->toBe([
         'distinctId' => (string) $user->id,
         'properties' => PersonProperties::for($user),
+        'groups' => ['supporters_club' => 'harbour-city-exiles'],
     ])->and($settings['bootstrap'])->toBe([
         'distinctID' => (string) $user->id,
         'isIdentifiedID' => true,

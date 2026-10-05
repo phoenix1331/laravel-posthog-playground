@@ -99,6 +99,7 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 - Abandoned = `Basket::abandonable()`: checkout started, `user_id` set, `abandoned_at` null, `updated_at` at least `Basket::ABANDON_AFTER_MINUTES` (30) ago. A conditional `UPDATE ... WHERE abandoned_at IS NULL` claims each basket so overlapping sweeps cannot fire twice; `occurredAt` is last activity + 30 minutes. Only checkout-stage baskets qualify because the job has no session to recover an anonymous ID
 - `App\Analytics\DistinctId` (scoped): user ID when logged in, else the posthog-js cookie ID, else a UUID v7 kept in the session under `analytics.anonymous_id`; `useAnonymousId()` overrides it outside HTTP (simulator). It reads `request()` at call time because the subscriber, and so `DistinctId`, is first built at boot
 - **Identity stitching:** `AnalyticsEventSubscriber::onLogin()` handles Laravel's `Illuminate\Auth\Events\Login` (password login, `Auth::login()` after registration, remember-me). It calls `alias(userId, anonymousId)` so PostHog merges the anonymous person into the user, then `identify(userId, PersonProperties::for($user))`. The alias is skipped when the anonymous ID already equals the user ID (the browser identified first). With PostHog, alias is queued before identify
+- **Groups:** `App\Analytics\Groups` defines the `supporters_club` group type (key: supporters' club slug). `Groups::for($user)` is attached to every server event whose actor belongs to a club (anonymous visitors and club-less supporters send none). `Groups::properties()` (`name`, `club` slug, `members` count; never a member list) is sent with `groupIdentify` on each member login and for every club by `matchday:sync-groups` (`make sync-groups`). posthog-js joins the group via `posthog.group()` from `identity.groups`, so client events carry it too. Group analytics may be a paid PostHog add-on depending on plan; events carry `$groups` either way, so breakdowns appear once it is enabled
 - `App\Analytics\PersonProperties`: `supporters_club` (slug), `has_supporters_club`, `signed_up_at` (date). No name or email, same rule as event properties
 
 ## Client analytics (posthog-js)
@@ -126,6 +127,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `ticket_purchased` | Server, from `TicketPurchased` | booking (includes `revenue` in pounds and `currency`) |
 | `checkout_abandoned` | Server, scheduled job | basket |
 | `$create_alias`, `$identify` | Server, on `Login` | alias: user ID + anonymous ID; identify: `PersonProperties` |
+| `$groupidentify` | Server, on member `Login` and `matchday:sync-groups` | `Groups::properties()` |
 
 | Builder method | Keys |
 |---|---|
@@ -229,7 +231,7 @@ Pest's `php` preset does not cover `dd`/`dump`; those are asserted explicitly ra
 |---|---|
 | `App\Http\Controllers` does not use `PostHog`, `App\Analytics` or `CaptureAnalyticsEvent` | Controllers never call PostHog (brief's definition of done) |
 | `PostHog` only used in `App\Analytics`, `CaptureAnalyticsEvent`, `AnalyticsServiceProvider` | The SDK is contained |
-| `App\Analytics\Analytics` only used in `App\Analytics`, `AnalyticsEventSubscriber`, `AnalyticsServiceProvider` | One translation table |
+| `App\Analytics\Analytics` only used in `App\Analytics`, `AnalyticsEventSubscriber`, `AnalyticsServiceProvider`, `SyncAnalyticsGroups` | One translation table, plus the group sync command |
 | `App\Events`, `App\Models`, `App\Checkout`, `App\Basket` do not use `PostHog` or `App\Analytics` | Domain code fires events and nothing else |
 | `FakeAnalytics` only used in `App\Analytics` | The fake never ships into app code |
 

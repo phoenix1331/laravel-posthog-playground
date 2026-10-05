@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { syncIdentity } from './identity.js';
 
-function fakePostHog({ distinctId = 'anon-1', userState = 'anonymous' } = {}) {
+function fakePostHog({ distinctId = 'anon-1', userState = 'anonymous', groups = {} } = {}) {
     const calls = [];
 
     return {
@@ -11,6 +11,8 @@ function fakePostHog({ distinctId = 'anon-1', userState = 'anonymous' } = {}) {
         get_property: (key) => (key === '$user_state' ? userState : undefined),
         identify: (id, properties) => calls.push(['identify', id, properties]),
         reset: () => calls.push(['reset']),
+        getGroups: () => groups,
+        group: (type, key) => calls.push(['group', type, key]),
     };
 }
 
@@ -49,4 +51,28 @@ test('leaves an anonymous visitor alone', () => {
 
     assert.equal(syncIdentity(posthog, undefined), 'unchanged');
     assert.deepEqual(posthog.calls, []);
+});
+
+test("joins the supporter's group so client events carry it", () => {
+    const posthog = fakePostHog({ distinctId: '42', userState: 'identified' });
+
+    syncIdentity(posthog, { ...identity, groups: { supporters_club: 'harbour-city-exiles' } });
+
+    assert.deepEqual(posthog.calls, [['group', 'supporters_club', 'harbour-city-exiles']]);
+});
+
+test('does not rejoin a group the browser is already in', () => {
+    const posthog = fakePostHog({ distinctId: '42', userState: 'identified', groups: { supporters_club: 'harbour-city-exiles' } });
+
+    syncIdentity(posthog, { ...identity, groups: { supporters_club: 'harbour-city-exiles' } });
+
+    assert.deepEqual(posthog.calls, []);
+});
+
+test('identifies before joining the group on first login', () => {
+    const posthog = fakePostHog();
+
+    syncIdentity(posthog, { ...identity, groups: { supporters_club: 'harbour-city-exiles' } });
+
+    assert.deepEqual(posthog.calls.map((call) => call[0]), ['identify', 'group']);
 });
