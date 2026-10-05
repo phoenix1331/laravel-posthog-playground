@@ -14,7 +14,7 @@ it('resolves the null driver when there is no project token', function (): void 
     config(['posthog.disabled' => false, 'posthog.project_token' => null]);
 
     expect(AnalyticsServiceProvider::sending())->toBeFalse()
-        ->and(app(Analytics::class))->toBeInstanceOf(NullAnalytics::class);
+        ->and(app(Analytics::class)->inner())->toBeInstanceOf(NullAnalytics::class);
 });
 
 it('does not send when switched off even with a token', function (): void {

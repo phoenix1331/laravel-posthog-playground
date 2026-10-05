@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { applyConsent, bindConsentBanner, readConsent } from './consent';
 import { syncIdentity } from './identity';
 
 /**
@@ -9,7 +10,10 @@ import { syncIdentity } from './identity';
  * - bootstrap.distinctID is the server's anonymous ID, so client events such
  *   as $pageview land on the same person as server-side funnel events; once
  *   posthog-js has its own cookie the server adopts that ID instead
- * - session replay stays off until it is configured with input masking
+ * - nothing is captured, persisted or recorded until the visitor accepts
+ *   analytics in the consent banner
+ * - session replay masks every input and anything marked data-ph-mask, and
+ *   never records elements with the ph-no-capture class (card details)
  * - identity then follows the server: identify on login, reset on logout
  */
 export function startAnalytics() {
@@ -27,10 +31,25 @@ export function startAnalytics() {
         defaults: '2026-08-30',
         bootstrap: settings.bootstrap,
         person_profiles: 'identified_only',
-        disable_session_recording: true,
+        opt_out_capturing_by_default: true,
+        opt_out_persistence_by_default: true,
+        disable_session_recording: false,
+        session_recording: {
+            maskAllInputs: true,
+            maskTextSelector: '[data-ph-mask]',
+        },
     });
 
+    applyConsent(posthog, readConsent(document.cookie));
     syncIdentity(posthog, settings.identity);
+
+    bindConsentBanner(document, (state) => {
+        applyConsent(posthog, state);
+
+        if (state === 'granted') {
+            syncIdentity(posthog, settings.identity);
+        }
+    });
 
     return posthog;
 }

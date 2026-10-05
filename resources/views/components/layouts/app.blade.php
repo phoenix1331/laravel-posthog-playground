@@ -27,7 +27,7 @@
                         <a href="{{ route('debug.flags') }}" class="hover:text-white">Debug</a>
                     @endcan
                     @auth
-                        <span class="text-white">{{ auth()->user()->name }}</span>
+                        <span class="text-white" data-ph-mask>{{ auth()->user()->name }}</span>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf
                             <button type="submit" class="hover:text-white">Log out</button>
@@ -50,6 +50,11 @@
 
         <footer class="mx-auto max-w-5xl px-4 pb-10 text-xs text-stone-500">
             Invented clubs, fake payments. A PostHog and Laravel playground.
+            @if (\App\Providers\AnalyticsServiceProvider::sending())
+                <a href="#" data-consent-preferences class="ml-2 underline hover:text-stone-700">Analytics preferences</a>
+            @endif
         </footer>
+
+        <x-consent-banner />
     </body>
 </html>

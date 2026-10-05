@@ -27,7 +27,7 @@ describe('PostHogAnalytics', function (): void {
         config(['posthog.disabled' => false, 'posthog.project_token' => 'phc_test']);
         app()->forgetInstance(Analytics::class);
 
-        expect(app(Analytics::class))->toBeInstanceOf(PostHogAnalytics::class);
+        expect(app(Analytics::class)->inner())->toBeInstanceOf(PostHogAnalytics::class);
     });
 
     it('queues capture on the analytics queue instead of sending in the request', function (): void {

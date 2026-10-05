@@ -4,7 +4,7 @@
     <div class="mx-auto max-w-xl">
         <p class="text-sm font-medium text-pitch-700">Booking confirmed</p>
         <h1 class="mt-1 text-2xl font-semibold tracking-tight">You're going to {{ $booking->fixture->title() }}</h1>
-        <p class="mt-1 text-sm text-stone-600">Reference <span class="font-mono font-medium text-stone-900">{{ $booking->reference }}</span></p>
+        <p class="mt-1 text-sm text-stone-600">Reference <span class="font-mono font-medium text-stone-900" data-ph-mask>{{ $booking->reference }}</span></p>
 
         <section class="mt-6 rounded-lg border border-stone-200 bg-white p-6">
             <p class="text-sm text-stone-600">

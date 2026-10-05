@@ -151,12 +151,26 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 
 | Piece | Detail |
 |---|---|
-| `resources/js/analytics.js` | `posthog.init()` from JSON settings in the page; `api_host` `/ingest`, `defaults: '2026-08-30'`, `person_profiles: 'identified_only'`, session replay off until masking is configured |
+| `resources/js/analytics.js` | `posthog.init()` from JSON settings in the page; `api_host` `/ingest`, `defaults: '2026-08-30'`, `person_profiles: 'identified_only'`, `opt_out_capturing_by_default` and `opt_out_persistence_by_default` (nothing captured, stored or recorded before consent), session replay with `maskAllInputs` and `maskTextSelector: '[data-ph-mask]'` |
+| `resources/js/consent.js` | `readConsent()`, `consentCookie()`, `applyConsent()` (opt in/out once, not on every page), `bindConsentBanner()`; tested with `node --test` |
+| `App\View\Components\ConsentBanner` (`<x-consent-banner />`) | Accept/Decline banner, rendered only while `sending()`, `hidden` server-side once a choice exists (no flash); footer "Analytics preferences" link reopens it |
 | `App\View\Components\PosthogConfig` (`<x-posthog-config :user="auth()->user()" />`) | Renders token, proxy path, UI host, `bootstrap` (user ID with `isIdentifiedID: true` when logged in, else the anonymous ID) and `identity` (user ID + `PersonProperties`, or null for guests); renders nothing unless `sending()`; never includes the secret key, name or email |
 | `resources/js/identity.js` `syncIdentity()` | Logged in and not yet that user: `identify()`. Identified as a different user: `reset()` then `identify()`, so two people are never merged. Guest but browser still identified: `reset()`. Import-free, tested with `node --test` (`resources/js/identity.test.js`, `make test-js`) |
 | `App\Http\Controllers\IngestProxyController` (`ANY /ingest/{path?}`) | Registered in `bootstrap/app.php` `then:` outside the `web` group (no session, cookies or CSRF); forwards raw path and query, body, selected headers and `X-Forwarded-For`; `static/` and `array/` go to the assets host; 404 unless `sending()`, 502 if PostHog is unreachable |
 
 **Shared anonymous ID:** on a first visit the server's anonymous ID bootstraps posthog-js. After that, `DistinctId` adopts `distinct_id` from the posthog-js cookie `ph_<token>_posthog` (exempted from encryption by `AnalyticsServiceProvider::exemptPostHogCookie()`), because the cookie outlives the Laravel session. Malformed or oversized cookie values are ignored, and so is a cookie in the `$user_state: identified` state: it belongs to whoever last logged in on that browser, so adopting it would credit a logged-out visitor's events to them or alias the next login into them. After logout the first page still uses the session's anonymous ID while posthog-js resets to a new one; the server adopts the new cookie ID from the next request.
+
+## Consent and session replay
+
+| Choice (`analytics_consent` cookie) | posthog-js | Session replay | Server-side events |
+|---|---|---|---|
+| none yet | opted out, no cookies | off | captured |
+| `granted` | opted in, persisted | on, masked | captured |
+| `denied` | opted out | off | dropped by `ConsentAwareAnalytics` |
+
+- `App\Analytics\Consent` reads the cookie (exempt from encryption: JavaScript writes it); `App\Analytics\ConsentAwareAnalytics` wraps whichever driver is bound and drops capture, identify, alias and group calls when the current request declined. `inner()` exposes the wrapped driver. Outside a request (queue jobs, scheduler, simulator) there is no choice to honour, so calls pass through
+- Decision: before any choice, server-side first-party events still flow while client tracking, cookies and replay wait for consent. Treating "no choice" as "no" server-side too would be stricter; change `Consent::denied()` to that if a deployment needs it
+- Masking: all inputs are masked; `ph-no-capture` on the card fields keeps them out of recordings entirely; `data-ph-mask` masks the nav user name and the booking reference
 
 ## Event catalogue
 

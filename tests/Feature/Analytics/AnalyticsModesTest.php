@@ -47,7 +47,7 @@ it('runs the whole journey with no PostHog token and queues nothing', function (
     Queue::fake();
     config(['posthog.disabled' => false, 'posthog.project_token' => null]);
 
-    expect(resolveAnalyticsFresh())->toBeInstanceOf(NullAnalytics::class);
+    expect(resolveAnalyticsFresh()->inner())->toBeInstanceOf(NullAnalytics::class);
 
     completeJourney();
 
@@ -69,7 +69,7 @@ it('queues every funnel event for PostHog when a token is set, all on the analyt
     Queue::fake();
     config(['posthog.disabled' => false, 'posthog.project_token' => 'phc_test']);
 
-    expect(resolveAnalyticsFresh())->toBeInstanceOf(PostHogAnalytics::class);
+    expect(resolveAnalyticsFresh()->inner())->toBeInstanceOf(PostHogAnalytics::class);
 
     completeJourney();
 

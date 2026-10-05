@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Analytics\Analytics;
+use App\Analytics\Consent;
+use App\Analytics\ConsentAwareAnalytics;
 use App\Analytics\DistinctId;
 use App\Analytics\Flags\FlagClientFactory;
 use App\Analytics\Flags\FlagScope;
@@ -25,12 +27,13 @@ class AnalyticsServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Wrapped so a visitor who declined analytics is never captured
         $this->app->singleton(Analytics::class, function (): Analytics {
             if (! self::sending()) {
-                return $this->nullAnalytics();
+                return new ConsentAwareAnalytics($this->nullAnalytics());
             }
 
-            return new PostHogAnalytics;
+            return new ConsentAwareAnalytics(new PostHogAnalytics);
         });
 
         // Used by the queue worker to deliver capture jobs. Flag definitions
@@ -79,11 +82,14 @@ class AnalyticsServiceProvider extends ServiceProvider
     }
 
     /**
-     * posthog-js writes its cookie as plain JSON; leave it unencrypted so
-     * DistinctId can adopt the browser's anonymous ID.
+     * posthog-js writes its cookie as plain JSON, and the consent banner
+     * writes analytics_consent from JavaScript; leave both unencrypted so the
+     * server can read them.
      */
     public static function exemptPostHogCookie(): void
     {
+        EncryptCookies::except(Consent::COOKIE);
+
         $cookie = DistinctId::postHogCookieName();
 
         if ($cookie !== null) {
