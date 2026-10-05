@@ -90,6 +90,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Feature flags (the "posthog" Pennant store)
+    |--------------------------------------------------------------------------
+    |
+    | evaluation: "local" computes flags in PHP from definitions downloaded
+    | with the secret key and cached for definitions_ttl seconds; "remote"
+    | asks PostHog per visitor. Local needs POSTHOG_PERSONAL_API_KEY; without
+    | it the SDK falls back to remote. exposure_ttl: how long a person's
+    | $feature_flag_called is remembered before it is sent again.
+    |
+    */
+
+    'flags' => [
+        'evaluation' => env('POSTHOG_FLAG_EVALUATION', 'local'),
+        'definitions_ttl' => (int) env('POSTHOG_FLAG_DEFINITIONS_TTL', 60),
+        'exposure_ttl' => (int) env('POSTHOG_FLAG_EXPOSURE_TTL', 86_400),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SDK client options
     |--------------------------------------------------------------------------
     |

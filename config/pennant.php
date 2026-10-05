@@ -17,7 +17,7 @@ return [
     |
     */
 
-    'default' => env('PENNANT_STORE', 'database'),
+    'default' => env('PENNANT_STORE', 'posthog'),
 
     /*
     |--------------------------------------------------------------------------
@@ -34,6 +34,10 @@ return [
 
         'array' => [
             'driver' => 'array',
+        ],
+
+        'posthog' => [
+            'driver' => 'posthog',
         ],
 
         'database' => [

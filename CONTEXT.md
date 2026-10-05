@@ -75,17 +75,31 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | `App\Analytics\FakeAnalytics` | Test double recording calls; `assertCaptured()`, `assertCapturedTimes()`, `assertNotCaptured()`, `assertNothingCaptured()`, `assertIdentified()`, `assertAliased()`, `assertGroupIdentified()` |
 | `App\Providers\AnalyticsServiceProvider` | Binds `Analytics` (PostHog when `sending()`, else null) and a `PostHog\Client` singleton for the worker, built with `loadFeatureFlags: false` |
 
-Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return a `FakeAnalytics`. `tests/Support/RecordingHttpClient.php` replaces the SDK's HTTP layer so jobs run through the real `PostHog\Client` and tests assert on the `/batch/` payload without network access.
+Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return a `FakeAnalytics`. `tests/Support/RecordingHttpClient.php` replaces the SDK's HTTP layer (with canned bodies per path, e.g. `/flags/`) so jobs run through the real `PostHog\Client` and tests assert on the `/batch/` payload without network access.
 
 **Delivery rules:** event time is fixed when the call is made (queue lag never shifts it; simulator timestamps pass straight through); each message carries a UUID generated once, so a retried job is de-duplicated by PostHog; every job flushes because the client batches in memory and a long-running worker would otherwise hold events; `groupIdentify()` is sent as a `$groupidentify` capture because `PostHog\Client` has no such method.
 
 ## Feature flags
 
-`laravel/pennant` 1.x, config in `config/pennant.php`, `features` table migrated. App code only ever calls `Feature::active()` / `Feature::value()`; PostHog will become the source through a custom Pennant driver, so callers never know.
+`laravel/pennant` 1.x with a custom `posthog` store (default). App code only calls `Feature::active()` / `Feature::value()`; PostHog is the source behind it.
+
+| Class (`app/Analytics/Flags/`) | Role |
+|---|---|
+| `PostHogFeatureDriver` | Pennant driver (`Driver`, `DefinesFeaturesExternally`). Returns PostHog's value (`false`, `true` or a variant key); app `Feature::define()` resolvers are fallbacks when not sending or PostHog lacks the flag (they always receive a `FlagScope`); records `$feature_flag_called` once per person, flag and value per `exposure_ttl` through the queued `Analytics` contract; `activate`/`forget`/`purge` throw `LogicException` because PostHog owns rollout |
+| `FlagScope` | Pennant scope: distinct ID + groups + person properties. Default scope (`Feature::resolveScopeUsing`) is `FlagScope::current()`, so anonymous visitors get flags too and keep them after login. `from()` accepts a `FlagScope`, `User`, distinct ID string or null |
+| `PostHogFlags` (scoped per request) | Calls `Client::getAllFlags()` once per distinct ID per request, records timings (`mode`, `milliseconds`, `flags`), swallows and reports errors (empty result, so fallbacks apply). Its client is built lazily on first use |
+| `CachedFlagDefinitions` | SDK `FlagDefinitionCacheProvider` on Laravel's cache (`posthog:flag-definitions`, `definitions_ttl`); one worker refreshes behind a 30 second lock |
 
 | Env key | Default | Purpose |
 |---|---|---|
-| `PENNANT_STORE` | `database` | Pennant store (`array` in `phpunit.xml`) |
+| `PENNANT_STORE` | `posthog` | Pennant store (`array` in `phpunit.xml`) |
+| `POSTHOG_FLAG_EVALUATION` | `local` | `local` (needs `POSTHOG_PERSONAL_API_KEY`) or `remote` (`/flags` per visitor) |
+| `POSTHOG_FLAG_DEFINITIONS_TTL` | `60` | Seconds flag definitions stay cached |
+| `POSTHOG_FLAG_EXPOSURE_TTL` | `86400` | Seconds before the same exposure is sent again |
+
+- Flag evaluation uses its own `PostHog\Client` (secret key + cache provider in local mode, no secret key in remote mode), separate from the capture client used by the worker
+- `getAllFlags()` rather than `evaluateFlags()`: the latter sends `$feature_flag_called` through the SDK client inside the request, which breaks "capture stays out of the request path"
+- Without a definition cache, PHP's per-request lifecycle would download every definition on every request, making "local" slower than remote
 
 ## Domain events to analytics
 
@@ -136,6 +150,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `checkout_abandoned` | Server, scheduled job | basket |
 | `$create_alias`, `$identify` | Server, on `Login` | alias: user ID + anonymous ID; identify: `PersonProperties` |
 | `$groupidentify` | Server, on member `Login` and `matchday:sync-groups` | `Groups::properties()` |
+| `$feature_flag_called` | Server, from `PostHogFeatureDriver` | `$feature_flag`, `$feature_flag_response` (`EventProperties::featureFlag()`) |
 
 | Builder method | Keys |
 |---|---|

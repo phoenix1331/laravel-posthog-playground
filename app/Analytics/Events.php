@@ -26,6 +26,9 @@ final class Events
 
     public const string CHECKOUT_ABANDONED = 'checkout_abandoned';
 
+    /** PostHog's own exposure event, sent when a flag is first evaluated for a person */
+    public const string FEATURE_FLAG_CALLED = '$feature_flag_called';
+
     /**
      * Server-side events in funnel order.
      *

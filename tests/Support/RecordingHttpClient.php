@@ -17,8 +17,13 @@ final class RecordingHttpClient extends HttpClient
     /** @var list<array{path: string, payload: array<string, mixed>}> */
     public array $requests = [];
 
-    public function __construct(private readonly int $status = 200)
-    {
+    /**
+     * @param  array<string, string>  $bodies  response body by path prefix, e.g. ['/flags/' => '{"flags": {...}}']
+     */
+    public function __construct(
+        private readonly int $status = 200,
+        private readonly array $bodies = [],
+    ) {
         parent::__construct('test.posthog.invalid');
     }
 
@@ -26,7 +31,19 @@ final class RecordingHttpClient extends HttpClient
     {
         $this->requests[] = ['path' => $path, 'payload' => json_decode((string) $payload, true) ?? []];
 
-        return new HttpResponse('{}', $this->status);
+        $body = collect($this->bodies)->first(fn (string $body, string $prefix): bool => str_starts_with($path, $prefix), '{}');
+
+        return new HttpResponse($body, $this->status);
+    }
+
+    /**
+     * Requests whose path starts with the given prefix.
+     *
+     * @return list<array{path: string, payload: array<string, mixed>}>
+     */
+    public function requestsTo(string $prefix): array
+    {
+        return array_values(array_filter($this->requests, fn (array $request): bool => str_starts_with($request['path'], $prefix)));
     }
 
     /**

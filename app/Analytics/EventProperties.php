@@ -51,6 +51,9 @@ final class EventProperties
         'booking_reference',
         // Group
         'supporters_club',
+        // Feature flags (PostHog's reserved names)
+        '$feature_flag',
+        '$feature_flag_response',
     ];
 
     /**
@@ -137,6 +140,14 @@ final class EventProperties
                 'revenue' => round($booking->total_pence / 100, 2),
                 'currency' => 'GBP',
             ]);
+    }
+
+    /**
+     * Exposure to a flag, in the shape PostHog experiments read.
+     */
+    public function featureFlag(string $flag, bool|string $response): self
+    {
+        return $this->with(['$feature_flag' => $flag, '$feature_flag_response' => $response]);
     }
 
     public function supportersClub(?SupportersClub $supportersClub): self
