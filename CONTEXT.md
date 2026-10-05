@@ -135,6 +135,24 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 
 **Personal data:** `with()` rejects any key not in `EventProperties::ALLOWED`, so names, emails and card details cannot reach an event; the only identifier sent is the distinct ID. Null values are dropped. `make($at)` takes the event time so backdated simulator events get correct relative values.
 
+## Simulator
+
+`php artisan matchday:simulate --users=500 --days=30 [--seed=N]` (`make simulate USERS=500 DAYS=30`). `App\Simulation\Simulator` fires the real domain events with backdated `occurredAt`, so analytics flows through the same subscriber, contract and queue as live traffic.
+
+| Persona (`App\Simulation\Persona`) | Share | Behaviour |
+|---|---|---|
+| Browser | 45 | 1-3 fixtures, seldom selects (25%), checkout 40%, buys 45% |
+| Bargain hunter | 25 | 2-5 fixtures, cheapest seats across all viewed, buys 60% |
+| Loyal away fan | 15 | Own club's away fixtures, away end, coach 80%, always in a supporters' club, buys 90% |
+| Abandoner | 15 | Reaches checkout 90% of the time, never pays |
+
+- Nothing is written to the database: baskets, bookings and the checkout `User` are unsaved models with relations set by hand; stock is never decremented
+- One distinct ID per simulated supporter, `sim-<16 hex>`, for the whole journey (filter on the `sim-` prefix in PostHog). The unsaved `User` uses a string key, because `User`'s integer key type would cast `sim-...` to `0`
+- Every unpaid checkout fires `checkout_abandoned` 30 minutes later, as the real sweep would
+- Journeys start between `--days` ago and 3 hours ago, so abandonment never lands in the future
+- `--seed` makes runs repeatable (`Random\Randomizer` with `Mt19937`); the command prints persona and funnel tables so it is useful without a PostHog token
+- With a token, each event is one queued job and one HTTP flush; a 500-supporter run (~1,750 events) takes a few minutes to drain through the worker
+
 ## Seed data
 
 `DatabaseSeeder` calls `ClubSeeder`, `CompetitionSeeder`, `SupportersClubSeeder`, `UserSeeder`, `FixtureSeeder`. Data is fixed (no Faker), every seeder upserts on a natural key so re-seeding is safe, and `WithoutModelEvents` keeps seeding from firing domain events.
@@ -158,6 +176,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `resources/` | Blade views, JS and CSS built by Vite |
 | `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page, `POST /fixtures/{slug}/seats`, `/basket`, `POST`/`DELETE /basket/travel`, `/checkout` (auth), `/bookings/{reference}` (owner only) |
 | `app/Checkout/` | `PlaceBooking` (locks stock, charges, books, dispatches `TicketPurchased`), `FakePaymentGateway`, `CheckoutFailed` |
+| `app/Simulation/` | `Simulator`, `Persona`, `SimulationReport` for `matchday:simulate` |
 | `app/Analytics/` | Event catalogue (`Events`) and allow-listed property builder (`EventProperties`) |
 | `app/Events/` | Domain events (`TicketPurchased`, dispatched after commit) |
 | `app/Basket/CurrentBasket.php` | Session-scoped access to the visitor's basket (select seats, add/remove travel) |
