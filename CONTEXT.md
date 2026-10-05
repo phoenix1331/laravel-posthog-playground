@@ -79,6 +79,14 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 
 **Delivery rules:** event time is fixed when the call is made (queue lag never shifts it; simulator timestamps pass straight through); each message carries a UUID generated once, so a retried job is de-duplicated by PostHog; every job flushes because the client batches in memory and a long-running worker would otherwise hold events; `groupIdentify()` is sent as a `$groupidentify` capture because `PostHog\Client` has no such method.
 
+## Feature flags
+
+`laravel/pennant` 1.x, config in `config/pennant.php`, `features` table migrated. App code only ever calls `Feature::active()` / `Feature::value()`; PostHog will become the source through a custom Pennant driver, so callers never know.
+
+| Env key | Default | Purpose |
+|---|---|---|
+| `PENNANT_STORE` | `database` | Pennant store (`array` in `phpunit.xml`) |
+
 ## Domain events to analytics
 
 ```

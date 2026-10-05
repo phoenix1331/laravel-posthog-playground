@@ -32,6 +32,7 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <env name="PENNANT_STORE" value="array"/>
         <env name="POSTHOG_DISABLED" value="true"/>
         <env name="POSTHOG_PROJECT_TOKEN" value=""/>
         <env name="POSTHOG_PERSONAL_API_KEY" value=""/>
