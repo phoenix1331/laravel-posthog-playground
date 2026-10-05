@@ -73,6 +73,10 @@ class SimulateMatchday extends Command
             ])
             ->values());
 
+        $this->table(['checkout-cta', 'Checkouts', 'Purchases', 'Conversion'], collect($report->checkoutCtaVariants())
+            ->map(fn (array $variant, string $value): array => [$value, $variant['checkouts'], $variant['purchases'], $variant['rate'].'%'])
+            ->values());
+
         $this->components->info("{$report->total()} events generated.");
         $this->describeStitching($report);
 

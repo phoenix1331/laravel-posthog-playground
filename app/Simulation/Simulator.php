@@ -13,6 +13,7 @@ use App\Events\FixtureViewed;
 use App\Events\SeatSelected;
 use App\Events\TicketPurchased;
 use App\Events\TravelAdded;
+use App\Features\CheckoutCta;
 use App\Features\NewSeatPicker;
 use App\Models\Basket;
 use App\Models\Booking;
@@ -47,7 +48,8 @@ use RuntimeException;
  * Feature flags are assigned through Pennant exactly as the app does, so a
  * simulated visitor gets the same variant (and exposure event, backdated)
  * PostHog or the fallback would give them; the stadium-map picker nudges
- * seat selection up slightly so the rollout shows an effect.
+ * seat selection up slightly and the "test" checkout button lifts purchases,
+ * so both the rollout and the experiment show an effect.
  */
 class Simulator
 {
@@ -59,6 +61,9 @@ class Simulator
 
     /** Extra percentage points of seat selection for supporters shown the stadium map */
     private const int NEW_SEAT_PICKER_LIFT = 5;
+
+    /** Extra percentage points of purchase for supporters shown the "test" checkout button */
+    private const int CHECKOUT_CTA_LIFT = 8;
 
     private Randomizer $random;
 
@@ -143,10 +148,15 @@ class Simulator
         }
 
         $at = $this->later($at, 60, 300);
+
+        // The variant CheckoutController would render for this supporter
+        $cta = Feature::for(FlagScope::for($supporter, $at))->value(CheckoutCta::class);
+        $this->report->checkoutCta($cta);
+
         CheckoutStarted::dispatch($basket, $supporter, $at);
         $this->report->event(Events::CHECKOUT_STARTED);
 
-        if (! $this->chance($persona->purchases())) {
+        if (! $this->chance($this->purchaseChance($persona, $cta))) {
             CheckoutAbandoned::dispatch($basket, $supporter, $at->addMinutes(Basket::ABANDON_AFTER_MINUTES));
             $this->report->event(Events::CHECKOUT_ABANDONED);
 
@@ -156,6 +166,7 @@ class Simulator
         TicketPurchased::dispatch($this->booking($basket, $supporter, $this->later($at, 60, 240)));
         $this->report->event(Events::TICKET_PURCHASED);
         $this->report->purchaser();
+        $this->report->checkoutCtaPurchased();
     }
 
     /**
@@ -350,6 +361,19 @@ class Simulator
         }
 
         return Persona::Browser;
+    }
+
+    /**
+     * The "test" button converts slightly better, so the experiment has a
+     * winner to find. Personas who never pay are unaffected.
+     */
+    private function purchaseChance(Persona $persona, mixed $cta): int
+    {
+        if ($persona->purchases() === 0 || $cta !== CheckoutCta::TEST) {
+            return $persona->purchases();
+        }
+
+        return $persona->purchases() + self::CHECKOUT_CTA_LIFT;
     }
 
     private function chance(int $percent): bool

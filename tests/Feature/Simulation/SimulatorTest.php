@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Analytics\Events;
 use App\Analytics\FakeAnalytics;
+use App\Analytics\Flags\FlagScope;
 use App\Analytics\Flags\PostHogFlags;
 use App\Analytics\Flags\Rollout;
+use App\Features\CheckoutCta;
 use App\Features\NewSeatPicker;
 use App\Models\Basket;
 use App\Models\Booking;
@@ -230,5 +232,53 @@ describe('feature flags', function (): void {
                 ->and($exposure['timestamp']->lessThanOrEqualTo($firstView))->toBeTrue()
                 ->and($exposure['timestamp']->lessThan(now()->subHours(2)))->toBeTrue();
         });
+    });
+});
+
+describe('checkout cta experiment', function (): void {
+    it('gives each supporter at checkout the variant the checkout page would render', function (): void {
+        app(Simulator::class)->run(300, 30, seed: 31);
+
+        $this->analytics->captured(Events::CHECKOUT_STARTED)->each(function (array $call): void {
+            expect($call['properties']['$feature/checkout-cta'])
+                ->toBe((new CheckoutCta)->resolve(new FlagScope($call['distinct_id'])));
+        });
+    });
+
+    it('tags purchases with the variant from the same checkout', function (): void {
+        app(Simulator::class)->run(300, 30, seed: 32);
+
+        $variantAtCheckout = $this->analytics->captured(Events::CHECKOUT_STARTED)->pluck('properties.$feature/checkout-cta', 'distinct_id');
+
+        $this->analytics->captured(Events::TICKET_PURCHASED)->each(function (array $purchase) use ($variantAtCheckout): void {
+            expect($purchase['properties']['$feature/checkout-cta'])->toBe($variantAtCheckout[$purchase['distinct_id']]);
+        });
+    });
+
+    it('lets the test button convert better, so the experiment has a winner', function (): void {
+        $variants = app(Simulator::class)->run(2000, 30, seed: 1331)->checkoutCtaVariants();
+
+        expect(array_keys($variants))->toBe(['control', 'test'])
+            ->and($variants['test']['rate'])->toBeGreaterThan($variants['control']['rate'])
+            ->and($variants['test']['checkouts'] / ($variants['test']['checkouts'] + $variants['control']['checkouts']))
+            ->toBeGreaterThan(0.4)->toBeLessThan(0.6);
+    });
+
+    it('reports conversion that matches the events PostHog will receive', function (): void {
+        $report = app(Simulator::class)->run(200, 30, seed: 33);
+
+        foreach ($report->checkoutCtaVariants() as $variant => $counts) {
+            $checkouts = $this->analytics->captured(Events::CHECKOUT_STARTED, fn (array $call): bool => $call['properties']['$feature/checkout-cta'] === $variant);
+            $purchases = $this->analytics->captured(Events::TICKET_PURCHASED, fn (array $call): bool => $call['properties']['$feature/checkout-cta'] === $variant);
+
+            expect($checkouts)->toHaveCount($counts['checkouts'])
+                ->and($purchases)->toHaveCount($counts['purchases']);
+        }
+    });
+
+    it('prints the experiment table', function (): void {
+        $this->artisan('matchday:simulate', ['--users' => 100, '--seed' => 3])
+            ->expectsOutputToContain('checkout-cta | Checkouts | Purchases | Conversion')
+            ->assertSuccessful();
     });
 });

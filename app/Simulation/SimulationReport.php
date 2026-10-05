@@ -30,6 +30,11 @@ final class SimulationReport
 
     private ?bool $currentSeatPicker = null;
 
+    /** @var array<string, array{checkouts: int, purchases: int}> variant => counts */
+    private array $checkoutCta = [];
+
+    private ?string $currentCheckoutCta = null;
+
     public function __construct(public readonly bool $stitching = true)
     {
         $this->personas = array_fill_keys(array_column(Persona::cases(), 'value'), 0);
@@ -74,6 +79,40 @@ final class SimulationReport
                 ...$counts,
                 'rate' => $counts['supporters'] === 0 ? 0.0 : round($counts['selected'] / $counts['supporters'] * 100, 1),
             ]])
+            ->all();
+    }
+
+    /**
+     * Records the checkout-cta variant shown to the supporter at checkout.
+     */
+    public function checkoutCta(mixed $variant): void
+    {
+        $this->currentCheckoutCta = is_string($variant) ? $variant : 'none';
+        $this->checkoutCta[$this->currentCheckoutCta] ??= ['checkouts' => 0, 'purchases' => 0];
+        $this->checkoutCta[$this->currentCheckoutCta]['checkouts']++;
+    }
+
+    public function checkoutCtaPurchased(): void
+    {
+        if ($this->currentCheckoutCta !== null) {
+            $this->checkoutCta[$this->currentCheckoutCta]['purchases']++;
+        }
+    }
+
+    /**
+     * Checkouts, purchases and conversion per checkout-cta variant.
+     *
+     * @return array<string, array{checkouts: int, purchases: int, rate: float}>
+     */
+    public function checkoutCtaVariants(): array
+    {
+        ksort($this->checkoutCta);
+
+        return collect($this->checkoutCta)
+            ->map(fn (array $counts): array => [
+                ...$counts,
+                'rate' => $counts['checkouts'] === 0 ? 0.0 : round($counts['purchases'] / $counts['checkouts'] * 100, 1),
+            ])
             ->all();
     }
 
