@@ -45,8 +45,9 @@
             <x-form.field name="name_on_card" label="Name on card" required autocomplete="cc-name" :value="old('name_on_card', auth()->user()->name)" />
             <x-form.field name="card_number" label="Card number" type="password" required inputmode="numeric" autocomplete="off" placeholder="4242 4242 4242 4242" />
 
+            {{-- Label chosen server-side by the checkout-cta experiment, so it never flickers --}}
             <button type="submit" class="w-full rounded-md bg-pitch-600 px-4 py-2 text-sm font-medium text-white hover:bg-pitch-700">
-                Pay {{ $money($basket->totalPence()) }}
+                {{ $ctaLabel }}
             </button>
         </form>
     </div>

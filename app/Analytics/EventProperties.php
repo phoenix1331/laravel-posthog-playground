@@ -17,7 +17,8 @@ use Carbon\CarbonInterface;
  *
  * Only the keys listed in ALLOWED can be emitted, which is how the "no
  * personal data beyond the user ID" rule is enforced: names, emails and
- * card details have no way in. Add a key here before using it.
+ * card details have no way in. Add a key here before using it. The one
+ * open family is "$feature/<flag key>", PostHog's experiment variant tag.
  */
 final class EventProperties
 {
@@ -55,6 +56,8 @@ final class EventProperties
         '$feature_flag',
         '$feature_flag_response',
     ];
+
+    private const string EXPERIMENT_PREFIX = '$feature/';
 
     /**
      * @var array<string, scalar|null>
@@ -150,6 +153,15 @@ final class EventProperties
         return $this->with(['$feature_flag' => $flag, '$feature_flag_response' => $response]);
     }
 
+    /**
+     * The variant of an experiment this person is in, so PostHog can
+     * attribute the event to it.
+     */
+    public function experiment(string $flag, bool|string $variant): self
+    {
+        return $this->with([self::EXPERIMENT_PREFIX.$flag => $variant]);
+    }
+
     public function supportersClub(?SupportersClub $supportersClub): self
     {
         return $this->with(['supporters_club' => $supportersClub?->slug]);
@@ -160,7 +172,10 @@ final class EventProperties
      */
     public function with(array $properties): self
     {
-        $unknown = array_diff(array_keys($properties), self::ALLOWED);
+        $unknown = array_filter(
+            array_diff(array_keys($properties), self::ALLOWED),
+            fn (string $key): bool => ! str_starts_with($key, self::EXPERIMENT_PREFIX),
+        );
 
         if ($unknown !== []) {
             throw new \InvalidArgumentException('Analytics property not in the allow-list: '.implode(', ', $unknown));

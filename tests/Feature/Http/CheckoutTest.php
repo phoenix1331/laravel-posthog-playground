@@ -14,6 +14,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Testing\TestResponse;
+use Laravel\Pennant\Feature;
 
 uses(RefreshDatabase::class);
 
@@ -53,6 +54,7 @@ it('sends guests to log in and back to checkout afterwards', function (): void {
 });
 
 it('shows the order summary and test card', function (): void {
+    Feature::define('checkout-cta', 'control');
     $this->actingAs($this->user);
     basketFor($this->allocation, 2, $this->coach);
 

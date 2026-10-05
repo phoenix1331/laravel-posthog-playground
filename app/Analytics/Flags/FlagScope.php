@@ -48,13 +48,13 @@ final readonly class FlagScope implements FeatureScopeSerializeable
         return self::for($user instanceof User ? $user : null);
     }
 
-    public static function for(?User $user): self
+    public static function for(?User $user, ?CarbonImmutable $at = null): self
     {
         if ($user === null) {
-            return new self(app(DistinctId::class)->anonymous());
+            return new self(app(DistinctId::class)->anonymous(), at: $at);
         }
 
-        return new self(DistinctId::forUser($user), Groups::for($user), PersonProperties::for($user));
+        return new self(DistinctId::forUser($user), Groups::for($user), PersonProperties::for($user), $at);
     }
 
     /**

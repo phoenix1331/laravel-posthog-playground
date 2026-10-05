@@ -9,10 +9,12 @@ use App\Checkout\CheckoutFailed;
 use App\Checkout\FakePaymentGateway;
 use App\Checkout\PlaceBooking;
 use App\Events\CheckoutStarted;
+use App\Features\CheckoutCta;
 use App\Http\Requests\CheckoutRequest;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Laravel\Pennant\Feature;
 
 class CheckoutController extends Controller
 {
@@ -26,6 +28,7 @@ class CheckoutController extends Controller
 
         return view('checkout.show', [
             'basket' => $basket,
+            'ctaLabel' => CheckoutCta::label(Feature::value(CheckoutCta::class), $basket->totalPence()),
             'testCard' => FakePaymentGateway::SUCCESS_CARD,
         ]);
     }

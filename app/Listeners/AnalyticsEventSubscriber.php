@@ -8,6 +8,8 @@ use App\Analytics\Analytics;
 use App\Analytics\DistinctId;
 use App\Analytics\EventProperties;
 use App\Analytics\Events;
+use App\Analytics\Experiments;
+use App\Analytics\Flags\FlagScope;
 use App\Analytics\Groups;
 use App\Analytics\PersonProperties;
 use App\Events\CheckoutAbandoned;
@@ -17,8 +19,10 @@ use App\Events\SeatSelected;
 use App\Events\TicketPurchased;
 use App\Events\TravelAdded;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Events\Dispatcher;
+use Laravel\Pennant\Feature;
 
 /**
  * The translation table from domain events to analytics events. This is the
@@ -112,6 +116,21 @@ class AnalyticsEventSubscriber
     }
 
     /**
+     * Adds "$feature/<key>" for each experiment that tags this event. The
+     * variant comes from Pennant for the same person, so it is the one they
+     * were shown; tagged events come after the variant is displayed, so
+     * evaluating here never records exposure for someone who did not see it.
+     */
+    private function tagExperiments(EventProperties $properties, string $event, ?User $user, CarbonImmutable $at): void
+    {
+        foreach (Experiments::tagging($event) as $experiment) {
+            $variant = Feature::for(FlagScope::for($user, $at))->value($experiment);
+
+            $properties->experiment($experiment::key(), $variant);
+        }
+    }
+
+    /**
      * @return array<class-string, string>
      */
     public function subscribe(Dispatcher $events): array
@@ -129,6 +148,8 @@ class AnalyticsEventSubscriber
 
     private function capture(?User $user, string $name, EventProperties $properties, object $event): void
     {
+        $this->tagExperiments($properties, $name, $user, $event->occurredAt);
+
         $this->analytics->capture(
             distinctId: $this->distinctId->for($user),
             event: $name,

@@ -102,6 +102,7 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 | Feature | PostHog key | Fallback | Used in |
 |---|---|---|---|
 | `App\Features\NewSeatPicker` | `new-seat-picker` | `Rollout::includes()` at 20% | `FixtureController@show` picks `fixtures/partials/seat-map` (stadium map, radio stands around the pitch) or `seat-list`; both post to `seats.store`, so funnel events are unchanged |
+| `App\Features\CheckoutCta` | `checkout-cta` | `Rollout::variant()` 50/50 | Checkout button label (see Experiments) |
 
 - `App\Analytics\Flags\Rollout` reproduces PostHog's percentage bucketing (first 15 hex digits of `sha1("<key>.<distinct id>")` scaled to 0-1, included when at or below N/100), so fallbacks pick the same visitors PostHog would; a test checks it against the SDK's local evaluation for 400 IDs
 - Tests force a class feature with `Feature::define('<key>', true|false)`: `activateForEveryone()` only updates scopes already stored, not new visitors
@@ -109,6 +110,19 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 - `Feature::discover()` runs in `AnalyticsServiceProvider::boot()` after `Feature::extend()`: in `AppServiceProvider` it ran before the `posthog` driver existed and failed boot
 - `getAllFlags()` rather than `evaluateFlags()`: the latter sends `$feature_flag_called` through the SDK client inside the request, which breaks "capture stays out of the request path"
 - Without a definition cache, PHP's per-request lifecycle would download every definition on every request, making "local" slower than remote
+
+## Experiments
+
+| Experiment | Flag | Variants | Shown | Goal metric | Tagged events |
+|---|---|---|---|---|---|
+| `App\Features\CheckoutCta` | `checkout-cta` (multivariate) | `control` "Pay £X", `test` "Secure my seats for £X", 50/50 | Checkout button, chosen in `CheckoutController@show` via `Feature::value()` | `ticket_purchased` | `checkout_started`, `ticket_purchased`, `checkout_abandoned` |
+
+- **No flicker:** the variant is decided server-side and rendered into the HTML; nothing changes after load
+- **Exposure** (`$feature_flag_called`) is recorded where the button is rendered, so only people who reached checkout count as exposed
+- **Attribution:** `AnalyticsEventSubscriber::tagExperiments()` adds `$feature/<key>` to the events each experiment lists (`App\Analytics\Experiment::taggedEvents()`, registry `App\Analytics\Experiments::ALL`), evaluating the variant through Pennant for the same person. Earlier funnel steps are never tagged, because evaluating the flag there would record exposure for visitors who never saw the button. `EventProperties` accepts the `$feature/` prefix as the one open key family
+- **Fallback** reproduces PostHog's multivariate assignment (`Rollout::variant()`, salt `variant`, cumulative ranges); a test checks it against the SDK for 400 IDs
+- `App\Analytics\Experiment` lives outside `app/Features` because `Feature::discover()` tries to instantiate anything found there
+- **PostHog setup:** create a multivariate flag `checkout-cta` with variants `control` and `test` at 50% each and 100% rollout, then an experiment on it with `ticket_purchased` as the primary metric (a funnel `checkout_started` to `ticket_purchased` also works). Results need a project token and traffic: real checkouts or `make simulate`
 
 ## Domain events to analytics
 
