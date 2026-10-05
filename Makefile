@@ -2,7 +2,7 @@
 
 EXEC = docker compose exec app
 
-.PHONY: help up down build restart shell migrate seed fresh test logs queue-logs queue-restart scheduler-logs schedule-list simulate assets vite
+.PHONY: help up down build restart shell migrate seed fresh test test-js logs queue-logs queue-restart scheduler-logs schedule-list simulate assets vite
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -33,6 +33,9 @@ fresh: ## Drop all tables, re-run migrations and seed
 
 test: ## Run the test suite
 	@$(EXEC) php artisan test
+
+test-js: ## Run JavaScript unit tests with node --test (runs on the host)
+	@npm test
 
 logs: ## Tail app container logs
 	@docker compose logs -f app

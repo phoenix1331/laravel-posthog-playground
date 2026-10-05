@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { syncIdentity } from './identity';
 
 /**
  * Starts posthog-js when the server has rendered its settings into the page
@@ -9,6 +10,7 @@ import posthog from 'posthog-js';
  *   as $pageview land on the same person as server-side funnel events; once
  *   posthog-js has its own cookie the server adopts that ID instead
  * - session replay stays off until it is configured with input masking
+ * - identity then follows the server: identify on login, reset on logout
  */
 export function startAnalytics() {
     const element = document.getElementById('posthog-config');
@@ -27,6 +29,8 @@ export function startAnalytics() {
         person_profiles: 'identified_only',
         disable_session_recording: true,
     });
+
+    syncIdentity(posthog, settings.identity);
 
     return posthog;
 }

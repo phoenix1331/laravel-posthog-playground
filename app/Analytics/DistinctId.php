@@ -90,7 +90,19 @@ class DistinctId
         // Read the request at call time: this object can outlive the request it
         // was built in (the event subscriber is first resolved at boot)
         $state = json_decode((string) request()->cookies->get($name), true);
-        $id = is_array($state) ? ($state['distinct_id'] ?? null) : null;
+
+        if (! is_array($state)) {
+            return null;
+        }
+
+        // An identified cookie belongs to whoever last logged in on this
+        // browser. Treating it as anonymous would credit a logged-out
+        // visitor's events to that user, or alias the next login into them.
+        if (($state['$user_state'] ?? null) === 'identified') {
+            return null;
+        }
+
+        $id = $state['distinct_id'] ?? null;
 
         if (! is_string($id) || $id === '' || strlen($id) > self::MAX_LENGTH) {
             return null;

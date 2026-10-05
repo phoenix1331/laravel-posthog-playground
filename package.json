@@ -5,7 +5,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "node --test 'resources/js/**/*.test.js'"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.0.0",

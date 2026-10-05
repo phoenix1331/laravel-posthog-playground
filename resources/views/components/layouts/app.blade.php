@@ -10,7 +10,7 @@
         <title>{{ $title ? "{$title} | " : '' }}{{ config('app.name') }}</title>
 
         @fonts
-        <x-posthog-config />
+        <x-posthog-config :user="auth()->user()" />
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="min-h-screen bg-stone-50 font-sans text-stone-900 antialiased">

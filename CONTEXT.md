@@ -106,10 +106,11 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 | Piece | Detail |
 |---|---|
 | `resources/js/analytics.js` | `posthog.init()` from JSON settings in the page; `api_host` `/ingest`, `defaults: '2026-08-30'`, `person_profiles: 'identified_only'`, session replay off until masking is configured |
-| `App\View\Components\PosthogConfig` (`<x-posthog-config />` in the layout) | Renders token, proxy path, UI host and `bootstrap.distinctID`; renders nothing unless `sending()`; never includes the secret key |
+| `App\View\Components\PosthogConfig` (`<x-posthog-config :user="auth()->user()" />`) | Renders token, proxy path, UI host, `bootstrap` (user ID with `isIdentifiedID: true` when logged in, else the anonymous ID) and `identity` (user ID + `PersonProperties`, or null for guests); renders nothing unless `sending()`; never includes the secret key, name or email |
+| `resources/js/identity.js` `syncIdentity()` | Logged in and not yet that user: `identify()`. Identified as a different user: `reset()` then `identify()`, so two people are never merged. Guest but browser still identified: `reset()`. Import-free, tested with `node --test` (`resources/js/identity.test.js`, `make test-js`) |
 | `App\Http\Controllers\IngestProxyController` (`ANY /ingest/{path?}`) | Registered in `bootstrap/app.php` `then:` outside the `web` group (no session, cookies or CSRF); forwards raw path and query, body, selected headers and `X-Forwarded-For`; `static/` and `array/` go to the assets host; 404 unless `sending()`, 502 if PostHog is unreachable |
 
-**Shared anonymous ID:** on a first visit the server's anonymous ID bootstraps posthog-js. After that, `DistinctId` adopts `distinct_id` from the posthog-js cookie `ph_<token>_posthog` (exempted from encryption by `AnalyticsServiceProvider::exemptPostHogCookie()`), because the cookie outlives the Laravel session. Malformed or oversized cookie values are ignored.
+**Shared anonymous ID:** on a first visit the server's anonymous ID bootstraps posthog-js. After that, `DistinctId` adopts `distinct_id` from the posthog-js cookie `ph_<token>_posthog` (exempted from encryption by `AnalyticsServiceProvider::exemptPostHogCookie()`), because the cookie outlives the Laravel session. Malformed or oversized cookie values are ignored, and so is a cookie in the `$user_state: identified` state: it belongs to whoever last logged in on that browser, so adopting it would credit a logged-out visitor's events to them or alias the next login into them. After logout the first page still uses the session's anonymous ID while posthog-js resets to a new one; the server adopts the new cookie ID from the next request.
 
 ## Event catalogue
 
@@ -215,7 +216,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 
 | Item | Detail |
 |---|---|
-| Framework | Pest 5 with `pestphp/pest-plugin-laravel`; run via `make test` |
+| Framework | Pest 5 with `pestphp/pest-plugin-laravel`; run via `make test`. JavaScript: `node --test` on `resources/js/**/*.test.js`, run via `make test-js` (host Node, no extra dependencies) |
 | Database | In-memory SQLite (`phpunit.xml`), queue `sync`, cache and session `array` |
 | Arch rules | Pest `php` and `security` presets, no `dd`/`dump`/`ray`, `App` uses strict types, plus the analytics boundaries below |
 | Analytics modes | `tests/Feature/Analytics/AnalyticsModesTest.php` walks the full journey with no token, with the kill switch on (nothing queued) and with a token (every funnel event queued on `analytics`, in order) |
