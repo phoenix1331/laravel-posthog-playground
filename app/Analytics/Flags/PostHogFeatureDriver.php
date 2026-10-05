@@ -142,8 +142,9 @@ class PostHogFeatureDriver implements DefinesFeaturesExternally, Driver
         $this->analytics->capture(
             distinctId: $scope->distinctId,
             event: Events::FEATURE_FLAG_CALLED,
-            properties: EventProperties::make()->featureFlag($feature, $value)->toArray(),
+            properties: EventProperties::make($scope->at)->featureFlag($feature, $value)->toArray(),
             groups: $scope->groups,
+            timestamp: $scope->at,
         );
     }
 

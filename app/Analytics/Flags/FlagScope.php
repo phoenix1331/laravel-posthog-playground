@@ -8,6 +8,7 @@ use App\Analytics\DistinctId;
 use App\Analytics\Groups;
 use App\Analytics\PersonProperties;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Pennant\Contracts\FeatureScopeSerializeable;
 
@@ -18,6 +19,11 @@ use Laravel\Pennant\Contracts\FeatureScopeSerializeable;
  *
  * Groups and person properties travel with the scope so PostHog can match
  * group- and property-based release conditions without a round trip.
+ *
+ * $at is when the flag was seen. It is null for live requests (now) and set
+ * by the simulator so backdated journeys record exposure at the right time.
+ * It is not part of the serialised scope: a visitor is the same person
+ * whenever they are asked about.
  */
 final readonly class FlagScope implements FeatureScopeSerializeable
 {
@@ -29,6 +35,7 @@ final readonly class FlagScope implements FeatureScopeSerializeable
         public string $distinctId,
         public array $groups = [],
         public array $personProperties = [],
+        public ?CarbonImmutable $at = null,
     ) {}
 
     /**

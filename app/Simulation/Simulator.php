@@ -6,12 +6,14 @@ namespace App\Simulation;
 
 use App\Analytics\DistinctId;
 use App\Analytics\Events;
+use App\Analytics\Flags\FlagScope;
 use App\Events\CheckoutAbandoned;
 use App\Events\CheckoutStarted;
 use App\Events\FixtureViewed;
 use App\Events\SeatSelected;
 use App\Events\TicketPurchased;
 use App\Events\TravelAdded;
+use App\Features\NewSeatPicker;
 use App\Models\Basket;
 use App\Models\Booking;
 use App\Models\Fixture;
@@ -22,6 +24,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Collection;
+use Laravel\Pennant\Feature;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
 use RuntimeException;
@@ -40,6 +43,11 @@ use RuntimeException;
  * is skipped: the IDs stay separate people and the view-to-purchase funnel
  * collapses, which is the point of the comparison. The "sim-" prefix makes
  * simulated people easy to filter out in PostHog.
+ *
+ * Feature flags are assigned through Pennant exactly as the app does, so a
+ * simulated visitor gets the same variant (and exposure event, backdated)
+ * PostHog or the fallback would give them; the stadium-map picker nudges
+ * seat selection up slightly so the rollout shows an effect.
  */
 class Simulator
 {
@@ -48,6 +56,9 @@ class Simulator
 
     /** Share of non-fan supporters who belong to a supporters' club */
     private const int CLUB_MEMBERSHIP_CHANCE = 15;
+
+    /** Extra percentage points of seat selection for supporters shown the stadium map */
+    private const int NEW_SEAT_PICKER_LIFT = 5;
 
     private Randomizer $random;
 
@@ -98,9 +109,16 @@ class Simulator
         $this->distinctId->useAnonymousId("sim-anon-{$id}");
         $supporter = $this->supporter("sim-user-{$id}", $persona);
 
+        // Same Pennant call the fixture page makes, so the variant (and its
+        // exposure event) matches what this visitor would get in the app
+        $newSeatPicker = Feature::for(new FlagScope("sim-anon-{$id}", at: $at))->active(NewSeatPicker::class);
+        $this->report->seatPicker($newSeatPicker);
+
         $viewed = $this->browse($persona, $supporter, $at);
 
-        if (! $this->chance($persona->selectsSeats())) {
+        $lift = $newSeatPicker ? self::NEW_SEAT_PICKER_LIFT : 0;
+
+        if (! $this->chance($persona->selectsSeats() + $lift)) {
             return;
         }
 
@@ -186,6 +204,7 @@ class Simulator
         $at = $this->later($at, 30, 180);
         SeatSelected::dispatch($basket, null, $at);
         $this->report->event(Events::SEAT_SELECTED);
+        $this->report->seatsSelected();
 
         return $basket;
     }

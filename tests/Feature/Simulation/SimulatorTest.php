@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Analytics\Events;
 use App\Analytics\FakeAnalytics;
+use App\Analytics\Flags\PostHogFlags;
+use App\Analytics\Flags\Rollout;
+use App\Features\NewSeatPicker;
 use App\Models\Basket;
 use App\Models\Booking;
 use App\Models\Fixture;
@@ -14,6 +17,9 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Laravel\Pennant\Feature;
+use PostHog\Client;
+use Tests\Support\RecordingHttpClient;
 
 uses(RefreshDatabase::class);
 
@@ -173,4 +179,56 @@ it('explains what to do when there are no fixtures', function (): void {
     $this->artisan('matchday:simulate', ['--users' => 5])
         ->expectsOutputToContain('make fresh')
         ->assertFailed();
+});
+
+describe('feature flags', function (): void {
+    it('assigns the seat picker through Pennant, so overriding the flag changes every supporter', function (): void {
+        Feature::define('new-seat-picker', true);
+
+        $report = app(Simulator::class)->run(40, 30, seed: 2);
+
+        expect($report->seatPickerVariants()['true']['supporters'])->toBe(40)
+            ->and($report->seatPickerVariants()['false']['supporters'])->toBe(0);
+    });
+
+    it('gives each supporter the variant the app would, via the same rollout', function (): void {
+        $report = app(Simulator::class)->run(300, 30, seed: 21);
+
+        $anonymousIds = $this->analytics->captured(Events::FIXTURE_VIEWED)->pluck('distinct_id')->unique();
+        $inRollout = $anonymousIds->filter(fn (string $id): bool => Rollout::includes('new-seat-picker', $id, NewSeatPicker::ROLLOUT_PERCENTAGE));
+
+        expect($anonymousIds)->toHaveCount(300)
+            ->and($report->seatPickerVariants()['true']['supporters'])->toBe($inRollout->count());
+    });
+
+    it('shows the stadium map lifting seat selection', function (): void {
+        $variants = app(Simulator::class)->run(1000, 30, seed: 1331)->seatPickerVariants();
+
+        expect($variants['true']['rate'])->toBeGreaterThan($variants['false']['rate'])
+            ->and($variants['true']['supporters'] / 1000)->toBeGreaterThan(0.15)->toBeLessThan(0.25);
+    });
+
+    it('records backdated exposure for each supporter when PostHog serves the flag', function (): void {
+        config(['posthog.disabled' => false, 'posthog.project_token' => 'phc_test', 'pennant.default' => 'posthog']);
+        app()->instance(PostHogFlags::class, new PostHogFlags(
+            makeClient: fn () => new Client('phc_test', [], new RecordingHttpClient(bodies: [
+                '/flags/' => '{"flags": {"new-seat-picker": {"key": "new-seat-picker", "enabled": true, "variant": null}}}',
+            ]), loadFeatureFlags: false),
+            mode: PostHogFlags::REMOTE,
+        ));
+        Feature::forgetDrivers();
+
+        app(Simulator::class)->run(20, 10, seed: 4);
+
+        $exposures = $this->analytics->captured(Events::FEATURE_FLAG_CALLED);
+        expect($exposures)->toHaveCount(20);
+
+        $exposures->each(function (array $exposure): void {
+            $firstView = $this->analytics->captured(Events::FIXTURE_VIEWED)->where('distinct_id', $exposure['distinct_id'])->min('timestamp');
+
+            expect($exposure['properties'])->toBe(['$feature_flag' => 'new-seat-picker', '$feature_flag_response' => true])
+                ->and($exposure['timestamp']->lessThanOrEqualTo($firstView))->toBeTrue()
+                ->and($exposure['timestamp']->lessThan(now()->subHours(2)))->toBeTrue();
+        });
+    });
 });

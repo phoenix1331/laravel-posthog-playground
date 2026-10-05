@@ -9,6 +9,7 @@ use App\Analytics\Flags\FlagScope;
 use App\Analytics\Flags\PostHogFlags;
 use App\Models\SupportersClub;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Pennant\Feature;
@@ -205,4 +206,13 @@ it('keeps the request alive if PostHog flag evaluation fails', function (): void
     $flags = new PostHogFlags(makeClient: fn () => throw new RuntimeException('PostHog down'), mode: PostHogFlags::REMOTE);
 
     expect($flags->evaluate(new FlagScope('visitor-1')))->toBe([]);
+});
+
+it('stamps exposure with the scope time when one is given', function (): void {
+    postHogFlagsUsing(new RecordingHttpClient(bodies: ['/flags/' => REMOTE_FLAGS]));
+    $at = CarbonImmutable::parse('2026-09-01 10:00:00');
+
+    Feature::for(new FlagScope('visitor-1', at: $at))->active('new-seat-picker');
+
+    $this->analytics->assertCaptured(Events::FEATURE_FLAG_CALLED, fn (array $call): bool => $call['timestamp']->equalTo($at));
 });

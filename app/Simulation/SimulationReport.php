@@ -22,6 +22,14 @@ final class SimulationReport
 
     private int $purchasers = 0;
 
+    /** @var array{true: array{supporters: int, selected: int}, false: array{supporters: int, selected: int}} */
+    private array $seatPicker = [
+        'true' => ['supporters' => 0, 'selected' => 0],
+        'false' => ['supporters' => 0, 'selected' => 0],
+    ];
+
+    private ?bool $currentSeatPicker = null;
+
     public function __construct(public readonly bool $stitching = true)
     {
         $this->personas = array_fill_keys(array_column(Persona::cases(), 'value'), 0);
@@ -36,6 +44,37 @@ final class SimulationReport
     public function event(string $name): void
     {
         $this->events[$name]++;
+    }
+
+    /**
+     * Records the new-seat-picker variant for the supporter being simulated.
+     */
+    public function seatPicker(bool $newSeatPicker): void
+    {
+        $this->currentSeatPicker = $newSeatPicker;
+        $this->seatPicker[$newSeatPicker ? 'true' : 'false']['supporters']++;
+    }
+
+    public function seatsSelected(): void
+    {
+        if ($this->currentSeatPicker !== null) {
+            $this->seatPicker[$this->currentSeatPicker ? 'true' : 'false']['selected']++;
+        }
+    }
+
+    /**
+     * Supporters and seat-selection rate per new-seat-picker variant.
+     *
+     * @return array<string, array{supporters: int, selected: int, rate: float}>
+     */
+    public function seatPickerVariants(): array
+    {
+        return collect($this->seatPicker)
+            ->mapWithKeys(fn (array $counts, string $variant): array => [$variant => [
+                ...$counts,
+                'rate' => $counts['supporters'] === 0 ? 0.0 : round($counts['selected'] / $counts['supporters'] * 100, 1),
+            ]])
+            ->all();
     }
 
     public function login(): void

@@ -65,6 +65,14 @@ class SimulateMatchday extends Command
             ->map(fn (int $count, string $event): array => [$event, $count, round($count / $viewed * 100, 1).'%'])
             ->values());
 
+        $this->table(['new-seat-picker', 'Supporters', 'Selected seats'], collect($report->seatPickerVariants())
+            ->map(fn (array $variant, string $value): array => [
+                $value === 'true' ? 'stadium map' : 'list',
+                $variant['supporters'],
+                $variant['rate'].'%',
+            ])
+            ->values());
+
         $this->components->info("{$report->total()} events generated.");
         $this->describeStitching($report);
 
