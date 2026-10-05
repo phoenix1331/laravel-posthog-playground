@@ -20,6 +20,7 @@ use App\Models\TicketAllocation;
 use App\Models\TravelOption;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Collection;
 use Random\Engine\Mt19937;
 use Random\Randomizer;
@@ -33,8 +34,12 @@ use RuntimeException;
  * through the same subscriber, contract and queue. Baskets and bookings are
  * built in memory and never saved: stock, users and bookings are untouched.
  *
- * Each simulated supporter keeps one distinct ID ("sim-...") for their whole
- * journey, which is easy to filter out in PostHog.
+ * Each simulated supporter browses as "sim-anon-<hex>" and logs in at
+ * checkout as "sim-user-<hex>", firing Laravel's real Login event so the
+ * app's own identity stitching aliases the two. With stitching off the login
+ * is skipped: the IDs stay separate people and the view-to-purchase funnel
+ * collapses, which is the point of the comparison. The "sim-" prefix makes
+ * simulated people easy to filter out in PostHog.
  */
 class Simulator
 {
@@ -48,6 +53,8 @@ class Simulator
 
     private SimulationReport $report;
 
+    private bool $stitching = true;
+
     /** @var Collection<int, Fixture> */
     private Collection $fixtures;
 
@@ -57,12 +64,14 @@ class Simulator
     public function __construct(private readonly DistinctId $distinctId) {}
 
     /**
+     * @param  bool  $stitching  log supporters in at checkout so their anonymous browsing is aliased to them
      * @param  (callable(): void)|null  $tick  called once per simulated supporter
      */
-    public function run(int $supporters, int $days, ?int $seed = null, ?callable $tick = null): SimulationReport
+    public function run(int $supporters, int $days, ?int $seed = null, bool $stitching = true, ?callable $tick = null): SimulationReport
     {
         $this->random = new Randomizer($seed === null ? new Mt19937 : new Mt19937($seed));
-        $this->report = new SimulationReport;
+        $this->stitching = $stitching;
+        $this->report = new SimulationReport($stitching);
         $this->loadCatalogue();
 
         $windowEnd = CarbonImmutable::now()->subSeconds(self::JOURNEY_HEADROOM_SECONDS);
@@ -85,9 +94,9 @@ class Simulator
     {
         $this->report->supporter($persona);
 
-        $distinctId = 'sim-'.bin2hex($this->random->getBytes(8));
-        $this->distinctId->useAnonymousId($distinctId);
-        $supporter = $this->supporter($distinctId, $persona);
+        $id = bin2hex($this->random->getBytes(8));
+        $this->distinctId->useAnonymousId("sim-anon-{$id}");
+        $supporter = $this->supporter("sim-user-{$id}", $persona);
 
         $viewed = $this->browse($persona, $supporter, $at);
 
@@ -109,6 +118,12 @@ class Simulator
             return;
         }
 
+        // Checkout needs an account, so this is where the supporter logs in
+        if ($this->stitching) {
+            event(new Login('web', $supporter, false));
+            $this->report->login();
+        }
+
         $at = $this->later($at, 60, 300);
         CheckoutStarted::dispatch($basket, $supporter, $at);
         $this->report->event(Events::CHECKOUT_STARTED);
@@ -122,6 +137,7 @@ class Simulator
 
         TicketPurchased::dispatch($this->booking($basket, $supporter, $this->later($at, 60, 240)));
         $this->report->event(Events::TICKET_PURCHASED);
+        $this->report->purchaser();
     }
 
     /**
@@ -245,8 +261,8 @@ class Simulator
     }
 
     /**
-     * An unsaved user standing in for the supporter at checkout. Its ID is
-     * the simulated distinct ID, so the journey stays on one person.
+     * An unsaved user standing in for the supporter once they log in. Its ID
+     * is their simulated user distinct ID.
      */
     private function supporter(string $distinctId, Persona $persona): User
     {

@@ -55,18 +55,54 @@ it('sends every event through the analytics contract, matching its own report', 
     }
 });
 
-it('keeps each simulated supporter on one sim- distinct id from view to purchase', function (): void {
-    app(Simulator::class)->run(150, 30, seed: 42);
+it('browses anonymously, logs in at checkout and stitches the two ids', function (): void {
+    $report = app(Simulator::class)->run(150, 30, seed: 42);
 
     $captured = allCaptured($this->analytics);
-    expect($captured->pluck('distinct_id'))->each->toStartWith('sim-');
+    expect($captured->pluck('distinct_id'))->each->toMatch('/^sim-(anon|user)-[0-9a-f]{16}$/')
+        ->and($report->logins())->toBe($report->count(Events::CHECKOUT_STARTED));
 
     $this->analytics->captured(Events::TICKET_PURCHASED)->each(function (array $purchase) use ($captured): void {
-        $journey = $captured->where('distinct_id', $purchase['distinct_id']);
+        expect($purchase['distinct_id'])->toStartWith('sim-user-');
 
-        expect($journey->pluck('event'))->toContain(Events::FIXTURE_VIEWED, Events::SEAT_SELECTED, Events::CHECKOUT_STARTED)
-            ->and($journey->where('event', Events::FIXTURE_VIEWED)->min('timestamp')->lessThan($purchase['timestamp']))->toBeTrue();
+        $anonymousIds = $this->analytics->aliasesOf($purchase['distinct_id']);
+        $browsing = $captured->whereIn('distinct_id', $anonymousIds);
+
+        expect($anonymousIds)->toHaveCount(1)
+            ->and($anonymousIds[0])->toStartWith('sim-anon-')
+            ->and($browsing->pluck('event'))->toContain(Events::FIXTURE_VIEWED, Events::SEAT_SELECTED)
+            ->and($browsing->min('timestamp')->lessThan($purchase['timestamp']))->toBeTrue();
     });
+});
+
+it('identifies simulated supporters through the app\'s own login stitching', function (): void {
+    app(Simulator::class)->run(100, 30, seed: 8);
+
+    $buyer = $this->analytics->captured(Events::TICKET_PURCHASED)->first()['distinct_id'];
+
+    $this->analytics->assertIdentified($buyer);
+});
+
+it('without stitching, leaves every purchase on a person who never viewed a fixture', function (): void {
+    $report = app(Simulator::class)->run(150, 30, seed: 42, stitching: false);
+
+    $captured = allCaptured($this->analytics);
+    $viewers = $captured->where('event', Events::FIXTURE_VIEWED)->pluck('distinct_id')->unique();
+    $buyers = $this->analytics->captured(Events::TICKET_PURCHASED)->pluck('distinct_id');
+
+    expect($buyers)->not->toBeEmpty()
+        ->and($buyers->intersect($viewers))->toBeEmpty()
+        ->and($buyers->flatMap(fn (string $buyer) => $this->analytics->aliasesOf($buyer)))->toBeEmpty()
+        ->and($report->logins())->toBe(0)
+        ->and($report->viewToPurchaseRate())->toBe(0.0);
+});
+
+it('reports the per-person view to purchase rate PostHog will show', function (): void {
+    $stitched = app(Simulator::class)->run(300, 30, seed: 1331);
+    $purchases = $stitched->count(Events::TICKET_PURCHASED);
+
+    expect($stitched->viewToPurchaseRate())->toBe(round($purchases / 300 * 100, 1))
+        ->and($stitched->viewToPurchaseRate())->toBeGreaterThan(0.0);
 });
 
 it('backdates events inside the window and never into the future', function (): void {
@@ -114,6 +150,13 @@ it('runs from artisan and prints the funnel', function (): void {
         ->expectsOutputToContain('No PostHog token')
         ->expectsOutputToContain('fixture_viewed')
         ->expectsOutputToContain('events generated')
+        ->expectsOutputToContain('logins aliased')
+        ->assertSuccessful();
+});
+
+it('warns that the funnel breaks when run without stitching', function (): void {
+    $this->artisan('matchday:simulate', ['--users' => 50, '--seed' => 1, '--no-stitching' => true])
+        ->expectsOutputToContain('never viewed a fixture')
         ->assertSuccessful();
 });
 

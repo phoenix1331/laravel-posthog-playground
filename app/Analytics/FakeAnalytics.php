@@ -126,6 +126,19 @@ final class FakeAnalytics implements Analytics
         Assert::assertTrue($matches->isNotEmpty(), "Expected [{$distinctId}] to be identified.");
     }
 
+    /**
+     * IDs aliased to a distinct ID, in the order they were aliased.
+     *
+     * @return list<string>
+     */
+    public function aliasesOf(string $distinctId): array
+    {
+        return array_values(array_column(
+            array_filter($this->aliased, fn (array $call): bool => $call['distinct_id'] === $distinctId),
+            'alias',
+        ));
+    }
+
     public function assertAliased(string $distinctId, string $alias): void
     {
         Assert::assertContains(

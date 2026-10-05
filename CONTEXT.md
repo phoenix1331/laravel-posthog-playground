@@ -142,7 +142,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 
 ## Simulator
 
-`php artisan matchday:simulate --users=500 --days=30 [--seed=N]` (`make simulate USERS=500 DAYS=30`). `App\Simulation\Simulator` fires the real domain events with backdated `occurredAt`, so analytics flows through the same subscriber, contract and queue as live traffic.
+`php artisan matchday:simulate --users=500 --days=30 [--seed=N] [--no-stitching]` (`make simulate USERS=500 DAYS=30`, `make simulate-unstitched`). `App\Simulation\Simulator` fires the real domain events with backdated `occurredAt`, so analytics flows through the same subscriber, contract and queue as live traffic.
 
 | Persona (`App\Simulation\Persona`) | Share | Behaviour |
 |---|---|---|
@@ -152,7 +152,8 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | Abandoner | 15 | Reaches checkout 90% of the time, never pays |
 
 - Nothing is written to the database: baskets, bookings and the checkout `User` are unsaved models with relations set by hand; stock is never decremented
-- One distinct ID per simulated supporter, `sim-<16 hex>`, for the whole journey (filter on the `sim-` prefix in PostHog). The unsaved `User` uses a string key, because `User`'s integer key type would cast `sim-...` to `0`
+- Each supporter browses as `sim-anon-<hex>` and, on reaching checkout, logs in as `sim-user-<hex>` by firing Laravel's real `Login` event, so the app's own `onLogin` aliases, identifies and group-identifies them (filter on the `sim-` prefix in PostHog). The unsaved `User` uses a string key, because `User`'s integer key type would cast `sim-...` to `0`
+- `--no-stitching` skips that login: the same journeys, but purchases land on user IDs that never viewed a fixture, so a PostHog view-to-purchase funnel collapses to 0%. The command prints the per-person view-to-purchase rate PostHog will show (around 17% with stitching, 0% without) for the before/after comparison. Send the two runs to separate PostHog projects, or filter by time range, to compare them side by side
 - Every unpaid checkout fires `checkout_abandoned` 30 minutes later, as the real sweep would
 - Journeys start between `--days` ago and 3 hours ago, so abandonment never lands in the future
 - `--seed` makes runs repeatable (`Random\Randomizer` with `Mt19937`); the command prints persona and funnel tables so it is useful without a PostHog token

@@ -2,7 +2,7 @@
 
 EXEC = docker compose exec app
 
-.PHONY: help up down build restart shell migrate seed fresh test test-js logs queue-logs queue-restart scheduler-logs schedule-list simulate sync-groups assets vite
+.PHONY: help up down build restart shell migrate seed fresh test test-js logs queue-logs queue-restart scheduler-logs schedule-list simulate simulate-unstitched sync-groups assets vite
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -57,6 +57,9 @@ DAYS ?= 30
 
 simulate: ## Generate backdated PostHog traffic (USERS=500 DAYS=30, e.g. make simulate USERS=50)
 	@$(EXEC) php artisan matchday:simulate --users=$(USERS) --days=$(DAYS)
+
+simulate-unstitched: ## Same traffic without identity stitching, to show the broken funnel
+	@$(EXEC) php artisan matchday:simulate --users=$(USERS) --days=$(DAYS) --no-stitching
 
 sync-groups: ## Send every supporters club to PostHog as a group
 	@$(EXEC) php artisan matchday:sync-groups
