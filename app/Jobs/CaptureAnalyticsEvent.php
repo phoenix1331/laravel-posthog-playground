@@ -8,6 +8,7 @@ use App\Analytics\AnalyticsDeliveryFailed;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use PostHog\Client;
+use Throwable;
 
 /**
  * Delivers one prepared PostHog message from the queue worker.
@@ -45,11 +46,21 @@ class CaptureAnalyticsEvent implements ShouldQueue
         return [5, 30, 120, 600];
     }
 
+    /**
+     * Anything that goes wrong surfaces as AnalyticsDeliveryFailed, which
+     * ErrorReporter never sends to PostHog: reporting a failed delivery as
+     * an error would queue another delivery, and loop while PostHog is down.
+     */
     public function handle(Client $posthog): void
     {
-        $posthog->{$this->call}($this->message);
+        try {
+            $posthog->{$this->call}($this->message);
+            $delivered = $posthog->flush();
+        } catch (Throwable $exception) {
+            throw AnalyticsDeliveryFailed::for($this->call, $exception);
+        }
 
-        if (! $posthog->flush()) {
+        if (! $delivered) {
             throw AnalyticsDeliveryFailed::for($this->call);
         }
     }

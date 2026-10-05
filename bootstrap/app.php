@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Analytics\ErrorReporter;
 use App\Http\Controllers\IngestProxyController;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -25,6 +26,11 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // PostHog error tracking, alongside (not instead of) Laravel's own logging
+        $exceptions->report(function (Throwable $exception): void {
+            app(ErrorReporter::class)->report($exception);
+        });
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

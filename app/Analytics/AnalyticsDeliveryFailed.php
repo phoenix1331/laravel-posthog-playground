@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Analytics;
 
 use RuntimeException;
+use Throwable;
 
 /**
  * PostHog did not accept a batch. Thrown from the queued job so the queue
@@ -12,8 +13,8 @@ use RuntimeException;
  */
 final class AnalyticsDeliveryFailed extends RuntimeException
 {
-    public static function for(string $call): self
+    public static function for(string $call, ?Throwable $previous = null): self
     {
-        return new self("PostHog did not accept the {$call} batch.");
+        return new self("PostHog did not accept the {$call} batch.", previous: $previous);
     }
 }

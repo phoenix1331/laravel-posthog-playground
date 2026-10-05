@@ -34,6 +34,9 @@ export function startAnalytics() {
         opt_out_capturing_by_default: true,
         opt_out_persistence_by_default: true,
         disable_session_recording: false,
+        // Adds X-POSTHOG-SESSION-ID to our own fetch/XHR calls, so server-side
+        // errors from them link to this session's replay
+        tracing_headers: [window.location.hostname],
         session_recording: {
             maskAllInputs: true,
             maskTextSelector: '[data-ph-mask]',

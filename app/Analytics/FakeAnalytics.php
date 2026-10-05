@@ -7,6 +7,7 @@ namespace App\Analytics;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use PHPUnit\Framework\Assert;
+use Throwable;
 
 /**
  * Test double that records every call so tests can assert on what would
@@ -25,6 +26,9 @@ final class FakeAnalytics implements Analytics
 
     /** @var list<array{group_type: string, group_key: string, properties: array<string, scalar>}> */
     private array $groupsIdentified = [];
+
+    /** @var list<array{distinct_id: string, exception: Throwable, properties: array<string, scalar|null>}> */
+    private array $exceptions = [];
 
     public function capture(
         string $distinctId,
@@ -55,6 +59,31 @@ final class FakeAnalytics implements Analytics
     public function groupIdentify(string $groupType, string $groupKey, array $properties = []): void
     {
         $this->groupsIdentified[] = ['group_type' => $groupType, 'group_key' => $groupKey, 'properties' => $properties];
+    }
+
+    public function captureException(string $distinctId, Throwable $exception, array $properties = []): void
+    {
+        $this->exceptions[] = ['distinct_id' => $distinctId, 'exception' => $exception, 'properties' => $properties];
+    }
+
+    /**
+     * @param  class-string<Throwable>  $class
+     * @param  (callable(array{distinct_id: string, exception: Throwable, properties: array<string, scalar|null>}): bool)|null  $callback
+     */
+    public function assertExceptionCaptured(string $class, ?callable $callback = null): void
+    {
+        $matches = collect($this->exceptions)
+            ->filter(fn (array $call): bool => $call['exception'] instanceof $class)
+            ->filter($callback ?? fn (): bool => true);
+
+        Assert::assertTrue($matches->isNotEmpty(), "Expected exception [{$class}] was not captured.");
+    }
+
+    public function assertNoExceptionsCaptured(): void
+    {
+        $classes = implode(', ', array_map(fn (array $call): string => $call['exception']::class, $this->exceptions));
+
+        Assert::assertEmpty($this->exceptions, "Expected no exceptions, captured: {$classes}.");
     }
 
     /**

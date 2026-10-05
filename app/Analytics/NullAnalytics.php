@@ -6,6 +6,7 @@ namespace App\Analytics;
 
 use Carbon\CarbonInterface;
 use Psr\Log\LoggerInterface;
+use Throwable;
 
 /**
  * Used when there is no PostHog token or analytics is switched off. Drops
@@ -45,6 +46,16 @@ final class NullAnalytics implements Analytics
     public function groupIdentify(string $groupType, string $groupKey, array $properties = []): void
     {
         $this->log('groupIdentify', ['group_type' => $groupType, 'group_key' => $groupKey, 'properties' => $properties]);
+    }
+
+    public function captureException(string $distinctId, Throwable $exception, array $properties = []): void
+    {
+        $this->log('captureException', [
+            'distinct_id' => $distinctId,
+            'exception' => $exception::class,
+            'message' => $exception->getMessage(),
+            'properties' => $properties,
+        ]);
     }
 
     /**

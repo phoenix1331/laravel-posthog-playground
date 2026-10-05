@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Analytics;
 
 use Carbon\CarbonInterface;
+use Throwable;
 
 /**
  * The only way application code talks to an analytics backend. Listeners
@@ -49,4 +50,11 @@ interface Analytics
      * @param  array<string, scalar>  $properties
      */
     public function groupIdentify(string $groupType, string $groupKey, array $properties = []): void;
+
+    /**
+     * Report an exception for PostHog error tracking.
+     *
+     * @param  array<string, scalar|null>  $properties  context such as $session_id and the route
+     */
+    public function captureException(string $distinctId, Throwable $exception, array $properties = []): void;
 }

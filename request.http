@@ -154,3 +154,9 @@ POST {{baseUrl}}/debug/flags/clear-definitions
 Content-Type: application/x-www-form-urlencoded
 
 _token={{csrfToken}}
+
+###
+
+# Throw on purpose to see an error in PostHog error tracking (admin only); the header links it to a replay session
+GET {{baseUrl}}/debug/error
+X-POSTHOG-SESSION-ID: request-http-session

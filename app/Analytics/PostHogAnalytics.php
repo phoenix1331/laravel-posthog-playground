@@ -7,6 +7,8 @@ namespace App\Analytics;
 use App\Jobs\CaptureAnalyticsEvent;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Str;
+use PostHog\ExceptionPayloadBuilder;
+use Throwable;
 
 /**
  * Sends analytics to PostHog without touching the network in the request.
@@ -18,6 +20,8 @@ use Illuminate\Support\Str;
  */
 final class PostHogAnalytics implements Analytics
 {
+    private const int MAX_FRAMES = 30;
+
     public function capture(
         string $distinctId,
         string $event,
@@ -72,6 +76,33 @@ final class PostHogAnalytics implements Analytics
                 '$group_type' => $groupType,
                 '$group_key' => $groupKey,
                 '$group_set' => $properties,
+            ],
+            'timestamp' => $this->format(null),
+        ]);
+    }
+
+    /**
+     * Error tracking's $exception event. The stack trace is serialised here,
+     * in the request, with the SDK's own builder: a Throwable cannot be
+     * queued, and the trace must describe this process anyway. Reaching this
+     * point means the exception got past the app to Laravel's handler, so it
+     * is marked unhandled.
+     */
+    public function captureException(string $distinctId, Throwable $exception, array $properties = []): void
+    {
+        $exceptionList = ExceptionPayloadBuilder::overridePrimaryMechanism(
+            ExceptionPayloadBuilder::buildExceptionList($exception, self::MAX_FRAMES),
+            ['type' => 'laravel', 'handled' => false],
+        );
+
+        $this->queue(CaptureAnalyticsEvent::CAPTURE, [
+            'uuid' => (string) Str::uuid7(),
+            'distinct_id' => $distinctId,
+            'event' => '$exception',
+            'properties' => [
+                ...$properties,
+                '$exception_list' => $exceptionList,
+                '$exception_handled' => false,
             ],
             'timestamp' => $this->format(null),
         ]);

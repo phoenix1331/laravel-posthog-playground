@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Analytics;
 
 use Carbon\CarbonInterface;
+use Throwable;
 
 /**
  * Wraps the real Analytics driver and drops every call for a visitor who
@@ -56,6 +57,15 @@ final class ConsentAwareAnalytics implements Analytics
         }
 
         $this->inner->groupIdentify($groupType, $groupKey, $properties);
+    }
+
+    public function captureException(string $distinctId, Throwable $exception, array $properties = []): void
+    {
+        if (Consent::denied()) {
+            return;
+        }
+
+        $this->inner->captureException($distinctId, $exception, $properties);
     }
 
     public function inner(): Analytics

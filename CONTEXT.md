@@ -70,7 +70,7 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 
 | Class | Role |
 |---|---|
-| `App\Analytics\Analytics` | Interface: `capture()`, `identify()`, `alias()`, `groupIdentify()` |
+| `App\Analytics\Analytics` | Interface: `capture()`, `identify()`, `alias()`, `groupIdentify()`, `captureException()` |
 | `App\Analytics\PostHogAnalytics` | Bound when `sending()`; builds PostHog messages, stamps time and UUID v7 at dispatch, queues `CaptureAnalyticsEvent` on `posthog.queue` |
 | `App\Jobs\CaptureAnalyticsEvent` | Delivers one message via `PostHog\Client` (`capture`/`identify`/`alias`), then `flush()`; throws `AnalyticsDeliveryFailed` on rejection; 5 tries, backoff 5s/30s/2m/10m |
 | `App\Analytics\NullAnalytics` | No token or disabled; drops calls, or logs them when `posthog.log_channel` is set |
@@ -108,7 +108,7 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 
 - `App\Analytics\Flags\Rollout` reproduces PostHog's percentage bucketing (first 15 hex digits of `sha1("<key>.<distinct id>")` scaled to 0-1, included when at or below N/100), so fallbacks pick the same visitors PostHog would; a test checks it against the SDK's local evaluation for 400 IDs
 - Tests force a class feature with `Feature::define('<key>', true|false)`: `activateForEveryone()` only updates scopes already stored, not new visitors
-- **Debug page** `GET /debug/flags?samples=N` (`auth` + `can:view-debug`, gate defined in `AppServiceProvider`: `is_admin`; "Debug" nav link for admins): local vs remote for the current visitor plus `debug-sample-*` IDs, with setup, min/mean/max and total timings, per-visitor values and agreement, cache warm/cold and `POST /debug/flags/clear-definitions`. Without a token it lists fallback values. `App\Http\Controllers\Debug` is the one namespace exempt from the controllers-never-touch-analytics arch rule, and is still barred from the PostHog SDK
+- **Debug routes** (`auth` + `can:view-debug`): `GET /debug/error` throws on purpose for error tracking; **flags page** `GET /debug/flags?samples=N` (`auth` + `can:view-debug`, gate defined in `AppServiceProvider`: `is_admin`; "Debug" nav link for admins): local vs remote for the current visitor plus `debug-sample-*` IDs, with setup, min/mean/max and total timings, per-visitor values and agreement, cache warm/cold and `POST /debug/flags/clear-definitions`. Without a token it lists fallback values. `App\Http\Controllers\Debug` is the one namespace exempt from the controllers-never-touch-analytics arch rule, and is still barred from the PostHog SDK
 - `Feature::discover()` runs in `AnalyticsServiceProvider::boot()` after `Feature::extend()`: in `AppServiceProvider` it ran before the `posthog` driver existed and failed boot
 - `getAllFlags()` rather than `evaluateFlags()`: the latter sends `$feature_flag_called` through the SDK client inside the request, which breaks "capture stays out of the request path"
 - Without a definition cache, PHP's per-request lifecycle would download every definition on every request, making "local" slower than remote
@@ -185,6 +185,21 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 - Answers are first-party data on the basket, so they exist without PostHog; analytics for them still follows consent
 - Dusk journey "answers the exit survey" dispatches the exit-intent `mouseout` in a real browser and checks the stored reason
 
+## Error tracking
+
+`bootstrap/app.php` `withExceptions()` registers `$exceptions->report(...)` calling `App\Analytics\ErrorReporter::report()`, alongside Laravel's own logging (not instead of it). Only exceptions Laravel reports reach it (404s, validation and auth errors are filtered out by Laravel first).
+
+| Piece | Detail |
+|---|---|
+| `Analytics::captureException()` | On the contract; `PostHogAnalytics` builds `$exception_list` in the request with the SDK's `ExceptionPayloadBuilder` (a `Throwable` cannot be queued), marks it unhandled (`mechanism: laravel`), queues a `$exception` event; `NullAnalytics` logs it; `ConsentAwareAnalytics` drops it for a visitor who declined; `FakeAnalytics` has `assertExceptionCaptured()` / `assertNoExceptionsCaptured()` |
+| Person | Logged-in user ID, else the visitor's anonymous ID; outside a request (queue, scheduler) `matchday-server` with `$process_person_profile: false` |
+| Replay link | `$session_id` from `App\Analytics\PostHogSession`: the `X-POSTHOG-SESSION-ID` header (posthog-js `tracing_headers` adds it to our fetch/XHR calls) or `$sesid[1]` in the posthog-js cookie on page loads |
+| Context | `$pathname`, `http_method`, `route`, `environment`, `context` (`http`/`console`); never query strings, which can carry tokens or personal data |
+| Trigger | `GET /debug/error` (admin only, `ErrorDebugController`) throws on purpose |
+
+- **No loops:** `CaptureAnalyticsEvent` wraps anything thrown during delivery in `AnalyticsDeliveryFailed`, and `ErrorReporter` never reports that type; otherwise each failed delivery while PostHog is down would queue another
+- **Never makes things worse:** `ErrorReporter` swallows its own failures so the original exception is still logged
+
 ## Event catalogue
 
 Names live in `App\Analytics\Events` (snake_case, past tense); properties are built with `App\Analytics\EventProperties`.
@@ -201,6 +216,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `exit_survey_answered` | Server, from `CheckoutExitSurveyAnswered` | basket + `exit_reason` |
 | `survey sent` | Server, when `POSTHOG_EXIT_SURVEY_ID` is set | `$survey_id`, `$survey_response` |
 | `survey shown`, `survey dismissed` | Client, exit survey dialog | `$survey_id` |
+| `$exception` | Server, from `ErrorReporter` | `$exception_list`, `$exception_handled`, `$session_id`, `$pathname`, `http_method`, `route`, `environment`, `context` |
 | `$create_alias`, `$identify` | Server, on `Login` | alias: user ID + anonymous ID; identify: `PersonProperties` |
 | `$groupidentify` | Server, on member `Login` and `matchday:sync-groups` | `Groups::properties()` |
 | `$feature_flag_called` | Server, from `PostHogFeatureDriver` | `$feature_flag`, `$feature_flag_response` (`EventProperties::featureFlag()`) |
