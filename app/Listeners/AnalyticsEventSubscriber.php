@@ -8,6 +8,7 @@ use App\Analytics\Analytics;
 use App\Analytics\DistinctId;
 use App\Analytics\EventProperties;
 use App\Analytics\Events;
+use App\Analytics\PersonProperties;
 use App\Events\CheckoutAbandoned;
 use App\Events\CheckoutStarted;
 use App\Events\FixtureViewed;
@@ -15,6 +16,7 @@ use App\Events\SeatSelected;
 use App\Events\TicketPurchased;
 use App\Events\TravelAdded;
 use App\Models\User;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Events\Dispatcher;
 
 /**
@@ -75,6 +77,31 @@ class AnalyticsEventSubscriber
     }
 
     /**
+     * Identity stitching. Before login the visitor is an anonymous ID; after
+     * it they are their user ID. Aliasing tells PostHog both are one person,
+     * so the browsing that led to a purchase stays attached to the buyer.
+     *
+     * Fires for password logins, Auth::login() after registration and
+     * remember-me logins alike. When the anonymous ID already is the user ID
+     * (the browser identified first) there is nothing to merge.
+     */
+    public function onLogin(Login $event): void
+    {
+        if (! $event->user instanceof User) {
+            return;
+        }
+
+        $userId = DistinctId::forUser($event->user);
+        $anonymousId = $this->distinctId->anonymous();
+
+        if ($anonymousId !== $userId) {
+            $this->analytics->alias($userId, $anonymousId);
+        }
+
+        $this->analytics->identify($userId, PersonProperties::for($event->user));
+    }
+
+    /**
      * @return array<class-string, string>
      */
     public function subscribe(Dispatcher $events): array
@@ -86,6 +113,7 @@ class AnalyticsEventSubscriber
             CheckoutStarted::class => 'onCheckoutStarted',
             TicketPurchased::class => 'onTicketPurchased',
             CheckoutAbandoned::class => 'onCheckoutAbandoned',
+            Login::class => 'onLogin',
         ];
     }
 

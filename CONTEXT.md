@@ -98,7 +98,8 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 - `App\Listeners\AnalyticsEventSubscriber` is the single translation table, registered with `Event::subscribe()` in `AnalyticsServiceProvider::boot()`; methods are `on*` so listener auto-discovery does not register them twice; runs synchronously because delivery is already queued and the distinct ID needs the request session
 - Abandoned = `Basket::abandonable()`: checkout started, `user_id` set, `abandoned_at` null, `updated_at` at least `Basket::ABANDON_AFTER_MINUTES` (30) ago. A conditional `UPDATE ... WHERE abandoned_at IS NULL` claims each basket so overlapping sweeps cannot fire twice; `occurredAt` is last activity + 30 minutes. Only checkout-stage baskets qualify because the job has no session to recover an anonymous ID
 - `App\Analytics\DistinctId` (scoped): user ID when logged in, else the posthog-js cookie ID, else a UUID v7 kept in the session under `analytics.anonymous_id`; `useAnonymousId()` overrides it outside HTTP (simulator). It reads `request()` at call time because the subscriber, and so `DistinctId`, is first built at boot
-- Until identity stitching (alias on login) exists, anonymous and logged-in events are separate people, so the funnel breaks at login: the intended "before" picture
+- **Identity stitching:** `AnalyticsEventSubscriber::onLogin()` handles Laravel's `Illuminate\Auth\Events\Login` (password login, `Auth::login()` after registration, remember-me). It calls `alias(userId, anonymousId)` so PostHog merges the anonymous person into the user, then `identify(userId, PersonProperties::for($user))`. The alias is skipped when the anonymous ID already equals the user ID (the browser identified first). With PostHog, alias is queued before identify
+- `App\Analytics\PersonProperties`: `supporters_club` (slug), `has_supporters_club`, `signed_up_at` (date). No name or email, same rule as event properties
 
 ## Client analytics (posthog-js)
 
@@ -123,6 +124,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `checkout_started` | Server | basket |
 | `ticket_purchased` | Server, from `TicketPurchased` | booking (includes `revenue` in pounds and `currency`) |
 | `checkout_abandoned` | Server, scheduled job | basket |
+| `$create_alias`, `$identify` | Server, on `Login` | alias: user ID + anonymous ID; identify: `PersonProperties` |
 
 | Builder method | Keys |
 |---|---|
