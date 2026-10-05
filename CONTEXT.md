@@ -97,6 +97,12 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 | `POSTHOG_FLAG_DEFINITIONS_TTL` | `60` | Seconds flag definitions stay cached |
 | `POSTHOG_FLAG_EXPOSURE_TTL` | `86400` | Seconds before the same exposure is sent again |
 
+| Feature | PostHog key | Fallback | Used in |
+|---|---|---|---|
+| `App\Features\NewSeatPicker` | `new-seat-picker` | `Rollout::includes()` at 20% | `FixtureController@show` picks `fixtures/partials/seat-map` (stadium map, radio stands around the pitch) or `seat-list`; both post to `seats.store`, so funnel events are unchanged |
+
+- `App\Analytics\Flags\Rollout` reproduces PostHog's percentage bucketing (first 15 hex digits of `sha1("<key>.<distinct id>")` scaled to 0-1, included when at or below N/100), so fallbacks pick the same visitors PostHog would; a test checks it against the SDK's local evaluation for 400 IDs
+- Tests force a class feature with `Feature::define('<key>', true|false)`: `activateForEveryone()` only updates scopes already stored, not new visitors
 - Flag evaluation uses its own `PostHog\Client` (secret key + cache provider in local mode, no secret key in remote mode), separate from the capture client used by the worker
 - `getAllFlags()` rather than `evaluateFlags()`: the latter sends `$feature_flag_called` through the SDK client inside the request, which breaks "capture stays out of the request path"
 - Without a definition cache, PHP's per-request lifecycle would download every definition on every request, making "local" slower than remote
@@ -205,6 +211,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `resources/` | Blade views, JS and CSS built by Vite |
 | `routes/web.php` | Web routes: `/` fixture list, `/fixtures/{slug}` fixture page, `POST /fixtures/{slug}/seats`, `/basket`, `POST`/`DELETE /basket/travel`, `/checkout` (auth), `/bookings/{reference}` (owner only) |
 | `app/Checkout/` | `PlaceBooking` (locks stock, charges, books, dispatches `TicketPurchased`), `FakePaymentGateway`, `CheckoutFailed` |
+| `app/Features/` | Pennant class features (PostHog key in `$name`, `resolve()` is the fallback) |
 | `app/Simulation/` | `Simulator`, `Persona`, `SimulationReport` for `matchday:simulate` |
 | `app/Analytics/` | Event catalogue (`Events`) and allow-listed property builder (`EventProperties`) |
 | `app/Events/` | Domain events (`TicketPurchased`, dispatched after commit) |

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Events\FixtureViewed;
+use App\Features\NewSeatPicker;
 use App\Models\Fixture;
 use App\Models\TicketAllocation;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Laravel\Pennant\Feature;
 
 class FixtureController extends Controller
 {
@@ -35,6 +37,7 @@ class FixtureController extends Controller
         return view('fixtures.show', [
             'fixture' => $fixture,
             'allocations' => $allocations,
+            'newSeatPicker' => Feature::active(NewSeatPicker::class),
             'travelOptions' => $fixture->travelOptions->sortBy('departs_at')->values(),
         ]);
     }
