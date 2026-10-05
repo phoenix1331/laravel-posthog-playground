@@ -8,6 +8,7 @@ use App\Http\Controllers\BasketController;
 use App\Http\Controllers\BookingController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\Debug\FlagDebugController;
+use App\Http\Controllers\ExitSurveyController;
 use App\Http\Controllers\FixtureController;
 use App\Http\Controllers\SeatSelectionController;
 use App\Http\Controllers\TravelController;
@@ -27,6 +28,7 @@ Route::middleware(EnsureBasketExists::class)->group(function (): void {
 Route::middleware(['auth', EnsureBasketExists::class])->group(function (): void {
     Route::get('/checkout', [CheckoutController::class, 'show'])->name('checkout.show');
     Route::post('/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+    Route::post('/checkout/exit-survey', [ExitSurveyController::class, 'store'])->name('checkout.exit-survey');
 });
 
 Route::get('/bookings/{booking}', [BookingController::class, 'show'])->middleware('auth')->name('bookings.show');

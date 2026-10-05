@@ -26,6 +26,11 @@ final class Events
 
     public const string CHECKOUT_ABANDONED = 'checkout_abandoned';
 
+    public const string EXIT_SURVEY_ANSWERED = 'exit_survey_answered';
+
+    /** PostHog's survey response event, read by its survey results page */
+    public const string SURVEY_SENT = 'survey sent';
+
     /** PostHog's own exposure event, sent when a flag is first evaluated for a person */
     public const string FEATURE_FLAG_CALLED = '$feature_flag_called';
 
@@ -52,6 +57,6 @@ final class Events
      */
     public static function server(): array
     {
-        return [...self::funnel(), self::CHECKOUT_ABANDONED];
+        return [...self::funnel(), self::CHECKOUT_ABANDONED, self::EXIT_SURVEY_ANSWERED];
     }
 }

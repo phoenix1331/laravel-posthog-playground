@@ -33,7 +33,7 @@ beforeEach(function (): void {
 
 it('names every server event in snake_case past tense', function (): void {
     expect(Events::server())->each->toMatch('/^[a-z]+(_[a-z]+)*ed$/')
-        ->and(Events::server())->toHaveCount(6)
+        ->and(Events::server())->toHaveCount(7)
         ->and(Events::funnel()[0])->toBe(Events::FIXTURE_VIEWED)
         ->and(Events::funnel())->toContain(Events::TICKET_PURCHASED)->not->toContain(Events::CHECKOUT_ABANDONED);
 });

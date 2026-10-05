@@ -1,3 +1,6 @@
 import { startAnalytics } from './analytics';
+import { bindExitSurvey } from './exit-survey';
 
-startAnalytics();
+const posthog = startAnalytics();
+
+bindExitSurvey(document, window.sessionStorage, posthog, window.fetch.bind(window));

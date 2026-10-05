@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\ExitReason;
+use App\Models\Basket;
 use App\Models\Fixture;
 use App\Models\TicketAllocation;
 use Database\Seeders\UserSeeder;
@@ -188,4 +190,31 @@ it('only offers stands that still have tickets', function (): void {
     $this->browse(function (Browser $browser) use ($soldOut): void {
         asNewVisitor($browser)->visit('/fixtures/'.$soldOut->fixture->slug)->assertSee('Sold out');
     });
+});
+
+it('answers the exit survey when heading out of checkout', function (): void {
+    $fixture = fixtureWithStock();
+    $email = aSupporter();
+
+    $this->browse(function (Browser $browser) use ($fixture, $email): void {
+        acceptAnalytics(asNewVisitor($browser))->visit('/fixtures/'.$fixture->slug);
+        selectSeats($browser, 1);
+
+        $browser->visit('/checkout');
+        logInAt($browser, $email)->waitForLocation('/checkout');
+
+        // The pointer leaving through the top of the window, as when reaching for another tab
+        $browser->script("document.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, clientY: -1, relatedTarget: null }));");
+
+        $browser->waitFor('@exit-survey')
+            ->assertSee('Before you go, what stopped you?')
+            ->radio('reason', 'too_expensive')
+            ->click('@exit-survey-submit')
+            ->waitForText('Thanks, that really helps.');
+
+        letAnalyticsFlush($browser);
+    });
+
+    $basket = Basket::whereHas('user', fn ($query) => $query->where('email', $email))->latest('updated_at')->first();
+    expect($basket?->exit_reason)->toBe(ExitReason::TooExpensive);
 });

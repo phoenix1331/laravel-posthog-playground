@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Analytics;
 
+use App\Enums\ExitReason;
 use App\Models\Basket;
 use App\Models\Booking;
 use App\Models\Fixture;
@@ -52,6 +53,10 @@ final class EventProperties
         'booking_reference',
         // Group
         'supporters_club',
+        // Exit survey
+        'exit_reason',
+        '$survey_id',
+        '$survey_response',
         // Feature flags (PostHog's reserved names)
         '$feature_flag',
         '$feature_flag_response',
@@ -160,6 +165,19 @@ final class EventProperties
     public function experiment(string $flag, bool|string $variant): self
     {
         return $this->with([self::EXPERIMENT_PREFIX.$flag => $variant]);
+    }
+
+    public function exitReason(ExitReason $reason): self
+    {
+        return $this->with(['exit_reason' => $reason->value]);
+    }
+
+    /**
+     * A response to a PostHog survey, in the shape its results page reads.
+     */
+    public function surveyResponse(string $surveyId, string $response): self
+    {
+        return $this->with(['$survey_id' => $surveyId, '$survey_response' => $response]);
     }
 
     public function supportersClub(?SupportersClub $supportersClub): self

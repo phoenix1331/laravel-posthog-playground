@@ -109,6 +109,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Surveys
+    |--------------------------------------------------------------------------
+    |
+    | checkout_exit: ID of an "API" survey in PostHog with one multiple-choice
+    | question. When set, exit survey answers are also sent as PostHog's
+    | "survey sent" event so they appear on the survey's results page.
+    |
+    */
+
+    'surveys' => [
+        'checkout_exit' => env('POSTHOG_EXIT_SURVEY_ID'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SDK client options
     |--------------------------------------------------------------------------
     |

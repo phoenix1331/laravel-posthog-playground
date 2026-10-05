@@ -61,6 +61,7 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 | `POSTHOG_QUEUE` | `queue` | `analytics` | Queue for server-side capture |
 | `POSTHOG_CONSUMER`, `POSTHOG_TIMEOUT_MS`, `POSTHOG_FLAG_TIMEOUT_MS`, `POSTHOG_DEBUG` | `client.*` | `lib_curl`, 3000, 1500, `false` | Passed to `PostHog\Client` |
 
+| `POSTHOG_EXIT_SURVEY_ID` | `surveys.checkout_exit` | empty | PostHog API survey that exit survey answers are sent to |
 | `POSTHOG_LOG_CHANNEL` | `log_channel` | empty | When not sending, log every analytics call to this channel (e.g. `single`) instead of dropping it |
 
 `phpunit.xml` forces `POSTHOG_DISABLED=true` and empty keys, so the test suite can never send to PostHog.
@@ -173,6 +174,17 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 - Decision: before any choice, server-side first-party events still flow while client tracking, cookies and replay wait for consent. Treating "no choice" as "no" server-side too would be stricter; change `Consent::denied()` to that if a deployment needs it
 - Masking: all inputs are masked; `ph-no-capture` on the card fields keeps them out of recordings entirely; `data-ph-mask` masks the nav user name and the booking reference
 
+## Checkout exit survey
+
+| Piece | Detail |
+|---|---|
+| Trigger | `resources/js/exit-survey.js`: pointer leaves through the top of the window on the checkout page (`isExitIntent()`), once per basket (`sessionStorage`), opens `<dialog id="exit-survey">` from `checkout/partials/exit-survey.blade.php`; not rendered once the basket has an answer |
+| Answer | `POST /checkout/exit-survey` (`auth` + basket, JSON `{reason}`, CSRF header) to `ExitSurveyController`: stores `baskets.exit_reason` (`App\Enums\ExitReason`), fires `CheckoutExitSurveyAnswered`; repeats are accepted and ignored |
+| Analytics | Subscriber always captures `exit_survey_answered` (basket properties + `exit_reason`). With `POSTHOG_EXIT_SURVEY_ID` set (an "API" survey in PostHog with one multiple-choice question), also `survey sent` with `$survey_id` and `$survey_response` (the reason's label), so answers appear on PostHog's survey results; the browser captures `survey shown` and `survey dismissed` for the same ID |
+
+- Answers are first-party data on the basket, so they exist without PostHog; analytics for them still follows consent
+- Dusk journey "answers the exit survey" dispatches the exit-intent `mouseout` in a real browser and checks the stored reason
+
 ## Event catalogue
 
 Names live in `App\Analytics\Events` (snake_case, past tense); properties are built with `App\Analytics\EventProperties`.
@@ -186,6 +198,9 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `checkout_started` | Server | basket |
 | `ticket_purchased` | Server, from `TicketPurchased` | booking (includes `revenue` in pounds and `currency`) |
 | `checkout_abandoned` | Server, scheduled job | basket |
+| `exit_survey_answered` | Server, from `CheckoutExitSurveyAnswered` | basket + `exit_reason` |
+| `survey sent` | Server, when `POSTHOG_EXIT_SURVEY_ID` is set | `$survey_id`, `$survey_response` |
+| `survey shown`, `survey dismissed` | Client, exit survey dialog | `$survey_id` |
 | `$create_alias`, `$identify` | Server, on `Login` | alias: user ID + anonymous ID; identify: `PersonProperties` |
 | `$groupidentify` | Server, on member `Login` and `matchday:sync-groups` | `Groups::properties()` |
 | `$feature_flag_called` | Server, from `PostHogFeatureDriver` | `$feature_flag`, `$feature_flag_response` (`EventProperties::featureFlag()`) |

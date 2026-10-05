@@ -84,6 +84,16 @@ _token={{csrfToken}}&name_on_card=Alex+Morgan&card_number=4000+0000+0000+0002
 
 ###
 
+# Exit survey answer for the current basket (one per basket; reasons in App\Enums\ExitReason)
+POST {{baseUrl}}/checkout/exit-survey
+Content-Type: application/json
+Accept: application/json
+X-CSRF-TOKEN: {{csrfToken}}
+
+{"reason": "too_expensive"}
+
+###
+
 # Booking confirmation (owner only, 404 for anyone else); replace the reference
 GET {{baseUrl}}/bookings/MD-XXXXXXXX
 Accept: text/html

@@ -13,6 +13,7 @@ use App\Analytics\Flags\FlagScope;
 use App\Analytics\Groups;
 use App\Analytics\PersonProperties;
 use App\Events\CheckoutAbandoned;
+use App\Events\CheckoutExitSurveyAnswered;
 use App\Events\CheckoutStarted;
 use App\Events\FixtureViewed;
 use App\Events\SeatSelected;
@@ -82,6 +83,28 @@ class AnalyticsEventSubscriber
     }
 
     /**
+     * Always our own catalogue event; additionally PostHog's "survey sent"
+     * when an API survey is configured, so answers show on its survey
+     * results page. The label is sent there because that is what PostHog
+     * displays; our event keeps the stable reason key.
+     */
+    public function onCheckoutExitSurveyAnswered(CheckoutExitSurveyAnswered $event): void
+    {
+        $this->capture($event->user, Events::EXIT_SURVEY_ANSWERED, EventProperties::make($event->occurredAt)
+            ->basket($event->basket)
+            ->exitReason($event->reason), $event);
+
+        $surveyId = config('posthog.surveys.checkout_exit');
+
+        if (blank($surveyId)) {
+            return;
+        }
+
+        $this->capture($event->user, Events::SURVEY_SENT, EventProperties::make($event->occurredAt)
+            ->surveyResponse($surveyId, $event->reason->label()), $event);
+    }
+
+    /**
      * Identity stitching. Before login the visitor is an anonymous ID; after
      * it they are their user ID. Aliasing tells PostHog both are one person,
      * so the browsing that led to a purchase stays attached to the buyer.
@@ -142,6 +165,7 @@ class AnalyticsEventSubscriber
             CheckoutStarted::class => 'onCheckoutStarted',
             TicketPurchased::class => 'onTicketPurchased',
             CheckoutAbandoned::class => 'onCheckoutAbandoned',
+            CheckoutExitSurveyAnswered::class => 'onCheckoutExitSurveyAnswered',
             Login::class => 'onLogin',
         ];
     }

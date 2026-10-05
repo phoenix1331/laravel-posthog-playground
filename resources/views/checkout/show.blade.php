@@ -52,4 +52,8 @@
             </button>
         </form>
     </div>
+
+    @if ($basket->exit_reason === null)
+        @include('checkout.partials.exit-survey')
+    @endif
 </x-layouts.app>

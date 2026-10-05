@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ExitReason;
 use Database\Factories\BasketFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -104,6 +105,7 @@ class Basket extends Model
             'quantity' => 'integer',
             'checkout_started_at' => 'datetime',
             'abandoned_at' => 'datetime',
+            'exit_reason' => ExitReason::class,
         ];
     }
 }
