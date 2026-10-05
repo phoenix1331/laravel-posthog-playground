@@ -196,9 +196,22 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 |---|---|
 | Framework | Pest 5 with `pestphp/pest-plugin-laravel`; run via `make test` |
 | Database | In-memory SQLite (`phpunit.xml`), queue `sync`, cache and session `array` |
-| Arch rules | Pest `php` and `security` presets, no `dd`/`dump`/`ray`, `App` uses strict types |
+| Arch rules | Pest `php` and `security` presets, no `dd`/`dump`/`ray`, `App` uses strict types, plus the analytics boundaries below |
+| Analytics modes | `tests/Feature/Analytics/AnalyticsModesTest.php` walks the full journey with no token, with the kill switch on (nothing queued) and with a token (every funnel event queued on `analytics`, in order) |
 
 Pest's `php` preset does not cover `dd`/`dump`; those are asserted explicitly rather than adopting the stricter `laravel` preset.
+
+**Analytics boundaries (`tests/ArchTest.php`):**
+
+| Rule | Enforces |
+|---|---|
+| `App\Http\Controllers` does not use `PostHog`, `App\Analytics` or `CaptureAnalyticsEvent` | Controllers never call PostHog (brief's definition of done) |
+| `PostHog` only used in `App\Analytics`, `CaptureAnalyticsEvent`, `AnalyticsServiceProvider` | The SDK is contained |
+| `App\Analytics\Analytics` only used in `App\Analytics`, `AnalyticsEventSubscriber`, `AnalyticsServiceProvider` | One translation table |
+| `App\Events`, `App\Models`, `App\Checkout`, `App\Basket` do not use `PostHog` or `App\Analytics` | Domain code fires events and nothing else |
+| `FakeAnalytics` only used in `App\Analytics` | The fake never ships into app code |
+
+Each rule was checked by planting a violation and confirming it fails. Pest 5.3 gotcha: with several targets in one `expect([...])`, `not->toUse()` missed violations outside the first target, so the domain rule loops one namespace at a time.
 
 ## Git hooks
 

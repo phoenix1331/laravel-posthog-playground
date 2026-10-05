@@ -17,3 +17,50 @@ arch('no insecure functions')
 arch('application code declares strict types')
     ->expect('App')
     ->toUseStrictTypes();
+
+/*
+|--------------------------------------------------------------------------
+| Analytics boundaries
+|--------------------------------------------------------------------------
+|
+| Business code fires domain events; one subscriber turns them into
+| analytics calls; only the analytics layer knows PostHog exists.
+|
+*/
+
+arch('controllers never call PostHog or the analytics layer')
+    ->expect('App\Http\Controllers')
+    ->not->toUse(['PostHog', 'App\Analytics', 'App\Jobs\CaptureAnalyticsEvent']);
+
+arch('the PostHog sdk is only used by the analytics layer')
+    ->expect('PostHog')
+    ->toOnlyBeUsedIn([
+        'App\Analytics',
+        'App\Jobs\CaptureAnalyticsEvent',
+        'App\Providers\AnalyticsServiceProvider',
+    ]);
+
+arch('the analytics contract is only called from the subscriber and the analytics layer')
+    ->expect('App\Analytics\Analytics')
+    ->toOnlyBeUsedIn([
+        'App\Analytics',
+        'App\Listeners\AnalyticsEventSubscriber',
+        'App\Providers\AnalyticsServiceProvider',
+    ]);
+
+// One rule per namespace: with several targets in one expect([...]),
+// not->toUse() only reliably checks the first (verified against Pest 5.3)
+foreach (['App\Events', 'App\Models', 'App\Checkout', 'App\Basket'] as $namespace) {
+    arch("{$namespace} knows nothing about analytics")
+        ->expect($namespace)
+        ->not->toUse(['PostHog', 'App\Analytics']);
+}
+
+arch('the analytics fake stays out of application code')
+    ->expect('App\Analytics\FakeAnalytics')
+    ->toOnlyBeUsedIn('App\Analytics');
+
+arch('domain events are plain dispatchable classes')
+    ->expect('App\Events')
+    ->toBeClasses()
+    ->toUseTrait('Illuminate\Foundation\Events\Dispatchable');
