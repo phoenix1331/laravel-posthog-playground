@@ -26,7 +26,7 @@ Laravel 13 playground showing how PostHog fits into a Laravel app the Laravel wa
 
 **Front end:** Blade + Tailwind 4 via Vite 8. Node runs on the host, not in the image: `make assets` builds to `public/build`, `make vite` runs the dev server with hot reload (writes `public/hot`). FrankenPHP serves the app, so `php artisan dev` is not used. Tests call `withoutVite()` in `tests/TestCase.php`.
 
-**Commands:** `Makefile` is the entry point (`make help` lists targets). All artisan, composer and test commands run inside the container via `docker compose exec app ...`, never on the host.
+**Commands:** `Makefile` is the entry point (`make help` lists targets). `make setup` bootstraps a fresh clone (.env, composer and npm install, app key, migrate and seed, assets, containers); it was verified from a bare clone. All artisan, composer and test commands run inside the container via `docker compose exec app ...`, never on the host.
 
 ## Domain model
 

@@ -2,10 +2,20 @@
 
 EXEC = docker compose exec app
 
-.PHONY: help up down build restart shell migrate seed fresh test test-js dusk logs queue-logs queue-restart scheduler-logs schedule-list simulate simulate-unstitched sync-groups assets vite
+.PHONY: help setup up down build restart shell migrate seed fresh test test-js dusk logs queue-logs queue-restart scheduler-logs schedule-list simulate simulate-unstitched sync-groups assets vite
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
+
+setup: ## First run on a fresh clone: .env, dependencies, app key, seeded database, assets, containers
+	@test -f .env || cp .env.example .env
+	@docker compose build
+	@docker compose run --rm --no-deps app composer install
+	@docker compose run --rm app php artisan key:generate
+	@docker compose run --rm app php artisan migrate --seed --force
+	@npm install
+	@npm run build
+	@docker compose up -d --wait
 
 up: ## Start all containers (app on APP_PORT, default 8000)
 	@docker compose up -d
