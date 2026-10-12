@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+use App\Providers\AnalyticsServiceProvider;
 
 it('defaults to PostHog Cloud EU', function (): void {
     expect(config('posthog.host'))->toBe('https://eu.i.posthog.com')
@@ -26,4 +27,14 @@ it('passes millisecond timeouts and a consumer to the sdk client', function (): 
         'feature_flag_request_timeout_ms' => 1500,
         'debug' => false,
     ]);
+});
+
+it('gives the sdk a host without the protocol, which its flag requests add themselves', function (): void {
+    expect(AnalyticsServiceProvider::clientOptions())
+        ->toMatchArray(['host' => 'eu.i.posthog.com', 'ssl' => true]);
+
+    config(['posthog.host' => 'http://posthog.local:8010']);
+
+    expect(AnalyticsServiceProvider::clientOptions())
+        ->toMatchArray(['host' => 'posthog.local:8010', 'ssl' => false]);
 });

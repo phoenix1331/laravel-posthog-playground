@@ -41,7 +41,7 @@ class AnalyticsServiceProvider extends ServiceProvider
         // them would cost an HTTP call whenever a secret key is set.
         $this->app->singleton(Client::class, fn (): Client => new Client(
             apiKey: config('posthog.project_token'),
-            options: ['host' => config('posthog.host'), ...config('posthog.client')],
+            options: self::clientOptions(),
             loadFeatureFlags: false,
         ));
 
@@ -105,6 +105,25 @@ class AnalyticsServiceProvider extends ServiceProvider
     public static function sending(): bool
     {
         return ! config('posthog.disabled') && filled(config('posthog.project_token'));
+    }
+
+    /**
+     * Options for every PostHog\Client. The SDK's own HTTP client (flags and
+     * flag definitions) prepends the protocol to `host` itself, so a URL like
+     * https://eu.i.posthog.com would become https://https://... and every
+     * flag request would time out. Only the capture consumer strips it.
+     *
+     * @return array<string, mixed>
+     */
+    public static function clientOptions(): array
+    {
+        $host = (string) config('posthog.host');
+
+        return [
+            'host' => preg_replace('#^https?://#i', '', $host),
+            'ssl' => ! str_starts_with(strtolower($host), 'http://'),
+            ...config('posthog.client'),
+        ];
     }
 
     /**

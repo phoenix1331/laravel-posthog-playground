@@ -79,7 +79,7 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 
 Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return a `FakeAnalytics`. `tests/Support/RecordingHttpClient.php` replaces the SDK's HTTP layer (with canned bodies per path, e.g. `/flags/`) so jobs run through the real `PostHog\Client` and tests assert on the `/batch/` payload without network access.
 
-**Delivery rules:** event time is fixed when the call is made (queue lag never shifts it; simulator timestamps pass straight through); each message carries a UUID generated once, so a retried job is de-duplicated by PostHog; every job flushes because the client batches in memory and a long-running worker would otherwise hold events; `groupIdentify()` is sent as a `$groupidentify` capture because `PostHog\Client` has no such method.
+**Delivery rules:** event time is fixed when the call is made (queue lag never shifts it; simulator timestamps pass straight through); each message carries a UUID generated once, so a retried job is de-duplicated by PostHog; every job flushes because the client batches in memory and a long-running worker would otherwise hold events; `groupIdentify()` is sent as a `$groupidentify` capture because `PostHog\Client` has no such method. Every `PostHog\Client` takes its options from `AnalyticsServiceProvider::clientOptions()`, which strips the protocol from `posthog.host` into `host` + `ssl`: the SDK's flag requests prepend `https://` themselves, so a full URL made every flag call time out (only the capture consumer strips it).
 
 ## Feature flags
 

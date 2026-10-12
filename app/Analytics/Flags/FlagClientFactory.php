@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Analytics\Flags;
 
+use App\Providers\AnalyticsServiceProvider;
 use Illuminate\Contracts\Cache\Repository;
 use PostHog\Client;
 
@@ -68,6 +69,6 @@ class FlagClientFactory
      */
     private function options(): array
     {
-        return ['host' => config('posthog.host'), ...config('posthog.client')];
+        return AnalyticsServiceProvider::clientOptions();
     }
 }
