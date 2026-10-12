@@ -1,8 +1,15 @@
 # laravel-posthog-playground
 
+<img width="3026" height="1654" alt="Screenshot 2026-10-12 170615" src="https://github.com/user-attachments/assets/29973630-2e08-448d-a3d0-fb1374d9a8f8" />
+
 A Laravel 13 football ticketing app that shows where PostHog fits in a real codebase: product analytics, identity, feature flags, experiments, session replay, surveys and error tracking, wired the Laravel way rather than as scattered SDK calls.
 
+<img width="3156" height="1664" alt="Screenshot 2026-10-12 170758" src="https://github.com/user-attachments/assets/8d8cd1bd-26dd-4e6d-9873-b9227f18ee9b" />
+
 > **PostHog Cloud (EU), free tier.** Self-hosting PostHog is out of scope. The app also runs with no PostHog account at all: analytics falls back to a null driver that can log every event locally.
+
+<img width="3048" height="1650" alt="Screenshot 2026-10-12 170550" src="https://github.com/user-attachments/assets/7f9c9da4-8c17-483b-bb98-3b0b4ee735c9" />
+
 
 **Matchday** sells tickets for invented clubs. Supporters browse fixtures, pick a stand, optionally add a coach for away days, log in and pay with a fake card. That funnel has obvious drop-off points and money at the end, which makes every PostHog feature easy to explain.
 
