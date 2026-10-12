@@ -289,6 +289,7 @@ Names live in `App\Analytics\Events` (snake_case, past tense); properties are bu
 | `request.http` | Example requests (fixtures, basket, checkout, auth, ingest proxy, debug); `@baseUrl` defaults to port 8000, POSTs need `@csrfToken` from the page |
 | `resources/views/components/layouts/app.blade.php` | Anonymous layout component (`<x-layouts.app>`) |
 | `app/Support/` | Small helpers (`Money::format()` for pence to pounds) |
+| `docs/` | GitHub Pages showcase: one static `index.html` (no build step, Google Fonts only), screenshots in `docs/images/`, `.nojekyll`. Funnel figures are a seeded run (`--users=500 --seed=1331`); update them if the simulator's odds change |
 | `tests/` | Pest suites: `Unit` (no framework), `Feature` (full app via `tests/Pest.php`), `Arch` (`tests/ArchTest.php`) |
 
 ## Decisions

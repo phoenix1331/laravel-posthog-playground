@@ -1,0 +1,601 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matchday: PostHog in Laravel</title>
+<meta name="description" content="A Laravel 13 football ticketing app that shows where PostHog fits in a real codebase: analytics, identity, feature flags, experiments, session replay, surveys and error tracking.">
+<meta property="og:title" content="Matchday: PostHog in Laravel">
+<meta property="og:description" content="Product analytics, flags, experiments, replay, surveys and error tracking, wired into a Laravel app the Laravel way.">
+<meta property="og:image" content="https://phoenix1331.github.io/laravel-posthog-playground/images/experiment.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root {
+    --pitch: #0f3d22;
+    --turf: #1f7a3d;
+    --chalk: #f6f8f5;
+    --line: #dfe6e0;
+    --ink: #13241a;
+    --mist: #56685c;
+    --floodlight: #f5c518;
+    --display: "Big Shoulders Display", "Arial Narrow", sans-serif;
+    --body: "Instrument Sans", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+    --measure: 68ch;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+    margin: 0;
+    background: var(--chalk);
+    color: var(--ink);
+    font: 400 1.0625rem/1.6 var(--body);
+}
+
+a { color: var(--turf); text-underline-offset: 0.2em; }
+a:hover { color: var(--pitch); }
+
+:focus-visible { outline: 3px solid var(--floodlight); outline-offset: 3px; border-radius: 2px; }
+
+img { display: block; max-width: 100%; height: auto; }
+
+code { font: 0.9em var(--mono); }
+
+.wrap { width: min(1120px, 100% - 32px); margin-inline: auto; }
+
+/* Header */
+.site-head {
+    background: var(--pitch);
+    color: #fff;
+}
+.site-head .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-block: 18px;
+}
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font: 600 1.15rem var(--body);
+}
+.brand::before {
+    content: "";
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--floodlight);
+}
+.site-head a { color: #fff; }
+.site-head a:hover { color: var(--floodlight); }
+
+/* Hero: the pitch, with its halfway line and centre circle as background markings */
+.hero {
+    position: relative;
+    overflow: hidden;
+    background: var(--pitch);
+    color: #fff;
+    padding-block: 56px 72px;
+}
+.hero::before,
+.hero::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+    border: 2px solid rgb(255 255 255 / 0.08);
+}
+.hero::before {
+    inset: 0 auto 0 50%;
+    border-width: 0 0 0 2px;
+}
+.hero::after {
+    width: 420px;
+    height: 420px;
+    left: calc(50% - 210px);
+    top: calc(50% - 210px);
+    border-radius: 50%;
+}
+.hero .wrap {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+    gap: 56px;
+    align-items: center;
+}
+.hero h1 {
+    margin: 0 0 20px;
+    font: 800 clamp(2.75rem, 6vw, 4.75rem)/0.95 var(--display);
+    letter-spacing: -0.005em;
+}
+.hero p {
+    margin: 0 0 16px;
+    max-width: 46ch;
+    color: rgb(255 255 255 / 0.82);
+    font-size: 1.125rem;
+}
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 28px;
+}
+.button {
+    display: inline-block;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    text-decoration: none;
+}
+.button-primary { background: var(--floodlight); color: var(--pitch); }
+.button-primary:hover { background: #ffd84a; color: var(--pitch); }
+.button-quiet { color: #fff; box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.45); }
+.button-quiet:hover { color: #fff; box-shadow: inset 0 0 0 1.5px #fff; }
+
+/* Funnel scoreboard */
+.board {
+    background: rgb(4 24 12 / 0.55);
+    border: 1px solid rgb(255 255 255 / 0.12);
+    border-radius: 10px;
+    padding: 24px;
+}
+.board-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+.board h2 {
+    margin: 0;
+    font: 600 1.05rem var(--body);
+}
+.board-sub {
+    margin: 2px 0 0;
+    color: rgb(255 255 255 / 0.6);
+    font-size: 0.875rem;
+}
+.switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px 6px 6px;
+    border: 1px solid rgb(255 255 255 / 0.25);
+    border-radius: 999px;
+    background: transparent;
+    color: #fff;
+    font: 500 0.875rem var(--body);
+    cursor: pointer;
+}
+.switch-track {
+    position: relative;
+    width: 36px;
+    height: 20px;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.25);
+    transition: background 0.2s;
+}
+.switch-track::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.2s;
+}
+.switch[aria-pressed="true"] .switch-track { background: var(--floodlight); }
+.switch[aria-pressed="true"] .switch-track::after { transform: translateX(16px); background: var(--pitch); }
+
+.steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 14px;
+}
+.step {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr 3.5rem;
+    align-items: center;
+    gap: 12px;
+}
+.step-name { font-size: 0.9375rem; color: rgb(255 255 255 / 0.85); }
+.step-bar {
+    height: 28px;
+    border-radius: 3px;
+    background: rgb(255 255 255 / 0.08);
+    overflow: hidden;
+}
+.step-fill {
+    display: block;
+    height: 100%;
+    width: var(--w);
+    background: #fff;
+    transition: width 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.step-count {
+    text-align: right;
+    font: 600 1.6rem/1 var(--display);
+    font-variant-numeric: tabular-nums;
+}
+.step-last .step-fill { background: var(--floodlight); }
+
+.board-result {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid rgb(255 255 255 / 0.12);
+}
+.board-rate {
+    font: 800 3.25rem/1 var(--display);
+    color: var(--floodlight);
+    font-variant-numeric: tabular-nums;
+    min-width: 3.4ch;
+}
+.board-note {
+    margin: 0;
+    font-size: 0.9375rem;
+    color: rgb(255 255 255 / 0.78);
+}
+
+/* Sections */
+section { padding-block: 72px; }
+section + section { border-top: 1px solid var(--line); }
+
+h2.title {
+    margin: 0 0 12px;
+    font: 800 clamp(2rem, 4vw, 2.75rem)/1 var(--display);
+}
+.lede {
+    margin: 0 0 36px;
+    max-width: var(--measure);
+    color: var(--mist);
+    font-size: 1.125rem;
+}
+
+/* Screenshots */
+.shots {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+.shots figure { margin: 0; }
+.shots .wide { grid-column: 1 / -1; }
+.shots a { display: block; }
+.shots img {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+}
+figcaption {
+    margin-top: 10px;
+    color: var(--mist);
+    font-size: 0.9375rem;
+}
+
+/* Pipeline */
+.pipeline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 0;
+    margin: 0 0 28px;
+    padding: 0;
+    list-style: none;
+}
+.pipeline li {
+    display: flex;
+    align-items: center;
+    font: 400 0.9375rem var(--mono);
+}
+.pipeline li span {
+    padding: 8px 12px;
+    border: 1.5px solid var(--ink);
+    border-radius: 4px;
+    background: #fff;
+}
+.pipeline li:last-child span { background: var(--pitch); border-color: var(--pitch); color: #fff; }
+.pipeline li + li::before {
+    content: "";
+    width: 28px;
+    height: 1.5px;
+    background: var(--ink);
+}
+.prose { max-width: var(--measure); }
+.prose p { margin: 0 0 16px; }
+
+/* Feature list */
+.features {
+    margin: 0;
+    display: grid;
+    grid-template-columns: 11rem 1fr;
+    border-top: 2px solid var(--ink);
+}
+.features dt,
+.features dd {
+    margin: 0;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line);
+}
+.features dt { font-weight: 600; padding-right: 24px; }
+.features dd { color: var(--mist); }
+.features dd strong { display: block; color: var(--ink); font-weight: 500; }
+
+/* Run it */
+.run {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 48px;
+    align-items: start;
+}
+.run-steps {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: run;
+}
+.run-steps li {
+    counter-increment: run;
+    display: grid;
+    grid-template-columns: 2.25rem 1fr;
+    padding-block: 12px;
+    border-bottom: 1px solid var(--line);
+}
+.run-steps li::before {
+    content: counter(run);
+    font: 800 1.5rem/1.2 var(--display);
+    color: var(--turf);
+}
+.run-steps li code {
+    display: inline-block;
+    margin-bottom: 2px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #e8eee9;
+    color: var(--ink);
+}
+.run-steps li p { margin: 0; color: var(--mist); }
+.run-steps li p:first-child { margin-bottom: 2px; }
+.stack {
+    margin: 0;
+    padding: 24px;
+    border-radius: 8px;
+    background: #fff;
+    border: 1px solid var(--line);
+}
+.stack h3 { margin: 0 0 12px; font: 600 1rem var(--body); }
+.stack ul { margin: 0; padding-left: 18px; color: var(--mist); }
+.stack li + li { margin-top: 6px; }
+
+/* Footer */
+.site-foot {
+    background: var(--pitch);
+    color: rgb(255 255 255 / 0.75);
+    padding-block: 40px;
+    font-size: 0.9375rem;
+}
+.site-foot .wrap {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px;
+}
+.site-foot a { color: #fff; }
+.site-foot p { margin: 0; }
+
+@media (max-width: 860px) {
+    .hero .wrap,
+    .run { grid-template-columns: 1fr; gap: 40px; }
+    .hero::before { display: none; }
+    .hero::after { left: auto; right: -210px; }
+    .shots { grid-template-columns: 1fr; }
+    .features { grid-template-columns: 1fr; }
+    .features dt { padding-bottom: 0; border-bottom: 0; }
+    .features dd { padding-top: 6px; }
+}
+
+@media (max-width: 640px) {
+    .pipeline { flex-direction: column; align-items: flex-start; gap: 0; }
+    .pipeline li { flex-direction: column; align-items: flex-start; }
+    .pipeline li + li::before { width: 1.5px; height: 18px; margin-left: 20px; }
+    .board-result { flex-direction: column; gap: 6px; }
+}
+
+@media (max-width: 480px) {
+    .step { grid-template-columns: 5.75rem 1fr 3rem; gap: 8px; }
+    .step-name { font-size: 0.8125rem; }
+    .board { padding: 18px; }
+    section { padding-block: 56px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .step-fill, .switch-track, .switch-track::after { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="site-head">
+    <div class="wrap">
+        <span class="brand">Matchday</span>
+        <a href="https://github.com/phoenix1331/laravel-posthog-playground">GitHub</a>
+    </div>
+</header>
+
+<main>
+    <div class="hero">
+        <div class="wrap">
+            <div>
+                <h1>PostHog in a real Laravel app</h1>
+                <p>Matchday is a football ticketing app built to show where product analytics belongs in a Laravel codebase: behind domain events, a contract and a queue, not scattered through controllers.</p>
+                <p>Analytics, identity, feature flags, an experiment, session replay, a survey and error tracking, all wired the Laravel way and all tested.</p>
+                <div class="actions">
+                    <a class="button button-primary" href="https://github.com/phoenix1331/laravel-posthog-playground">View the code on GitHub</a>
+                    <a class="button button-quiet" href="#run">Run it locally</a>
+                </div>
+            </div>
+
+            <div class="board" aria-labelledby="board-title">
+                <div class="board-head">
+                    <div>
+                        <h2 id="board-title">500 simulated supporters</h2>
+                        <p class="board-sub">People per funnel step, as PostHog counts them</p>
+                    </div>
+                    <button class="switch" type="button" aria-pressed="true" id="stitching">
+                        <span class="switch-track" aria-hidden="true"></span>
+                        Identity stitching
+                    </button>
+                </div>
+                <ol class="steps">
+                    <li class="step"><span class="step-name">Viewed a fixture</span><span class="step-bar"><span class="step-fill" style="--w: 100%"></span></span><span class="step-count">500</span></li>
+                    <li class="step"><span class="step-name">Chose seats</span><span class="step-bar"><span class="step-fill" style="--w: 53.8%"></span></span><span class="step-count">269</span></li>
+                    <li class="step" data-stitched="186"><span class="step-name">Started checkout</span><span class="step-bar"><span class="step-fill" style="--w: 37.2%"></span></span><span class="step-count">186</span></li>
+                    <li class="step step-last" data-stitched="106"><span class="step-name">Bought tickets</span><span class="step-bar"><span class="step-fill" style="--w: 21.2%"></span></span><span class="step-count">106</span></li>
+                </ol>
+                <div class="board-result" aria-live="polite">
+                    <span class="board-rate" id="rate">21%</span>
+                    <p class="board-note" id="note">view to purchase. Supporters browse anonymously and log in at checkout; aliasing the two IDs keeps them one person.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section>
+        <div class="wrap">
+            <h2 class="title">A shop with a funnel worth measuring</h2>
+            <p class="lede">Supporters browse fixtures for invented clubs, pick a stand, add a coach for away days and pay with a test card. Every step has drop-off and there is money at the end, which makes each PostHog feature easy to explain.</p>
+            <div class="shots">
+                <figure>
+                    <a href="images/fixtures.png"><img src="images/fixtures.png" width="3048" height="1650" alt="Matchday's upcoming fixtures page, listing matches with venues, kick-off times and starting prices." loading="lazy"></a>
+                    <figcaption>Upcoming fixtures, the first step of the funnel.</figcaption>
+                </figure>
+                <figure>
+                    <a href="images/fixture.png"><img src="images/fixture.png" width="3026" height="1654" alt="A fixture page for Kingsmoor Town v Harbour City, with ticket prices per stand and away travel coaches." loading="lazy"></a>
+                    <figcaption>Stands and away coaches for one fixture.</figcaption>
+                </figure>
+                <figure class="wide">
+                    <a href="images/experiment.png"><img src="images/experiment.png" width="3156" height="1664" alt="The Checkout CTA wording experiment in PostHog, comparing control and test conversion from checkout started to ticket purchased." loading="lazy"></a>
+                    <figcaption>The checkout button experiment in PostHog, measured from checkout started to ticket purchased.</figcaption>
+                </figure>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="wrap">
+            <h2 class="title">One path for every event</h2>
+            <p class="lede">Business code never mentions PostHog. It fires ordinary Laravel events, and one subscriber decides what analytics receives.</p>
+            <ol class="pipeline" aria-label="How an event reaches PostHog">
+                <li><span>TicketPurchased</span></li>
+                <li><span>AnalyticsEventSubscriber</span></li>
+                <li><span>Analytics contract</span></li>
+                <li><span>queue</span></li>
+                <li><span>PostHog</span></li>
+            </ol>
+            <div class="prose">
+                <p>The contract has three implementations: PostHog, a null driver that can log every call locally, and a fake with assertions for tests. Architecture tests stop controllers and models from reaching past it.</p>
+                <p>Delivery survives the queue. Each event's time is fixed when it happens, so a backlog never shifts it, and each carries its own ID, so a retried job is not counted twice.</p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <div class="wrap">
+            <h2 class="title">What is wired in</h2>
+            <p class="lede">Each PostHog product, and the decision that makes it worth reading.</p>
+            <dl class="features">
+                <dt>Product analytics</dt>
+                <dd><strong>Domain events, one subscriber, a queued driver.</strong>Controllers never call PostHog, and a test enforces it.</dd>
+                <dt>Identity</dt>
+                <dd><strong>Anonymous browsing is aliased to the account at login.</strong>Switch stitching off in the simulator and the funnel collapses to 0%.</dd>
+                <dt>Groups</dt>
+                <dd><strong>Supporters' clubs as a PostHog group.</strong>Server and browser events both carry it.</dd>
+                <dt>Feature flags</dt>
+                <dd><strong>A custom Laravel Pennant driver.</strong>App code calls <code>Feature::active()</code> and never knows PostHog is the source. Without PostHog, fallbacks reproduce its bucketing exactly.</dd>
+                <dt>Experiments</dt>
+                <dd><strong>Two checkout button labels, chosen on the server.</strong>No flicker, and exposure is only recorded where the button is actually seen.</dd>
+                <dt>Session replay</dt>
+                <dd><strong>posthog-js behind a consent banner.</strong>Nothing is recorded before consent, and card fields never are.</dd>
+                <dt>Surveys</dt>
+                <dd><strong>An exit survey when the pointer leaves checkout.</strong>Answers are saved on the basket and sent to a PostHog API survey.</dd>
+                <dt>Error tracking</dt>
+                <dd><strong>One hook in <code>withExceptions()</code>.</strong>Each error is linked to the person and the replay that led to it.</dd>
+            </dl>
+        </div>
+    </section>
+
+    <section id="run">
+        <div class="wrap">
+            <h2 class="title">Run it locally</h2>
+            <p class="lede">Docker does the heavy lifting. It runs without a PostHog account too, logging events locally instead.</p>
+            <div class="run">
+                <ol class="run-steps">
+                    <li><div><p><code>make setup</code></p><p>Builds the containers, seeds the database and starts the app on port 8000.</p></div></li>
+                    <li><div><p><code>make posthog-setup</code></p><p>Creates the flags, experiment and survey in your PostHog project through its API.</p></div></li>
+                    <li><div><p><code>make simulate</code></p><p>Sends 30 days of backdated supporter journeys, so every dashboard has data.</p></div></li>
+                    <li><div><p><code>make dusk</code></p><p>Drives a real Chromium through the funnel for genuine client events and replays.</p></div></li>
+                </ol>
+                <div class="stack">
+                    <h3>Built with</h3>
+                    <ul>
+                        <li>Laravel 13 on PHP 8.4, MySQL 8.4</li>
+                        <li>Docker Compose with FrankenPHP, a queue worker and a scheduler</li>
+                        <li><code>posthog-php</code> on the server, <code>posthog-js</code> in the browser</li>
+                        <li>Laravel Pennant for feature flags</li>
+                        <li>Blade, Tailwind 4 and Vite</li>
+                        <li>Pest, Laravel Dusk and <code>node --test</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="site-foot">
+    <div class="wrap">
+        <p>Built by <a href="https://phoenix1331.co.uk">Darren Williams</a>. MIT licence.</p>
+        <p><a href="https://github.com/phoenix1331/laravel-posthog-playground">github.com/phoenix1331/laravel-posthog-playground</a></p>
+    </div>
+</footer>
+
+<script>
+(() => {
+    const toggle = document.getElementById('stitching');
+    const rate = document.getElementById('rate');
+    const note = document.getElementById('note');
+    const viewed = 500;
+    const notes = {
+        on: 'view to purchase. Supporters browse anonymously and log in at checkout; aliasing the two IDs keeps them one person.',
+        off: 'view to purchase. Without the alias, checkouts land on user IDs that never viewed a fixture, so PostHog sees no one convert.',
+    };
+
+    toggle.addEventListener('click', () => {
+        const stitched = toggle.getAttribute('aria-pressed') !== 'true';
+        toggle.setAttribute('aria-pressed', String(stitched));
+
+        document.querySelectorAll('[data-stitched]').forEach((step) => {
+            const people = stitched ? Number(step.dataset.stitched) : 0;
+            step.querySelector('.step-fill').style.setProperty('--w', `${(people / viewed) * 100}%`);
+            step.querySelector('.step-count').textContent = people;
+        });
+
+        rate.textContent = stitched ? '21%' : '0%';
+        note.textContent = stitched ? notes.on : notes.off;
+    });
+})();
+</script>
+</body>
+</html>
