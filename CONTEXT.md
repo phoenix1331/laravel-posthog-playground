@@ -53,7 +53,7 @@ Money is stored as integer pence. Seats are not modelled individually: stock per
 |---|---|---|---|
 | `POSTHOG_DISABLED` | `disabled` | `false` | Kill switch; nothing is sent even with a token |
 | `POSTHOG_PROJECT_TOKEN` | `project_token` | empty | Public project key (`phc_...`); empty means the null analytics driver |
-| `POSTHOG_PERSONAL_API_KEY` | `secret_key` | empty | Personal (`phx_...`) or project secret (`phs_...`) key for local flag evaluation; server-side only |
+| `POSTHOG_PERSONAL_API_KEY` | `secret_key` | empty | Personal (`phx_...`) or project secret (`phs_...`) key for local flag evaluation; server-side only. `make posthog-setup` needs a personal key |
 | `POSTHOG_HOST` | `host` | `https://eu.i.posthog.com` | Ingestion and API |
 | `POSTHOG_ASSETS_HOST` | `assets_host` | `https://eu-assets.i.posthog.com` | Static assets behind the proxy |
 | `POSTHOG_UI_HOST` | `ui_host` | `https://eu.posthog.com` | PostHog app links when proxied |
@@ -124,7 +124,8 @@ Tests call `fakeAnalytics()` (defined in `tests/Pest.php`) to swap in and return
 - **Attribution:** `AnalyticsEventSubscriber::tagExperiments()` adds `$feature/<key>` to the events each experiment lists (`App\Analytics\Experiment::taggedEvents()`, registry `App\Analytics\Experiments::ALL`), evaluating the variant through Pennant for the same person. Earlier funnel steps are never tagged, because evaluating the flag there would record exposure for visitors who never saw the button. `EventProperties` accepts the `$feature/` prefix as the one open key family
 - **Fallback** reproduces PostHog's multivariate assignment (`Rollout::variant()`, salt `variant`, cumulative ranges); a test checks it against the SDK for 400 IDs
 - `App\Analytics\Experiment` lives outside `app/Features` because `Feature::discover()` tries to instantiate anything found there
-- **PostHog setup:** create a multivariate flag `checkout-cta` with variants `control` and `test` at 50% each and 100% rollout, then an experiment on it with `ticket_purchased` as the primary metric (a funnel `checkout_started` to `ticket_purchased` also works). Results need a project token and traffic: real checkouts or `make simulate` (the simulator's `test` variant converts better, so the experiment finds a winner)
+- **PostHog setup:** `matchday:posthog-setup [--days=30]` (`make posthog-setup`) creates both flags (rollouts read from `NewSeatPicker` / `CheckoutCta` constants), the "Checkout CTA wording" experiment (funnel `checkout_started` to `ticket_purchased`) and the "Checkout exit survey" (API type, `single_choice`, `ExitReason` labels), then writes the survey ID to `.env`. Idempotent: matches flags by key, the experiment by flag key, the survey by name, and leaves existing ones alone; a draft experiment is launched. The experiment start is backdated `--days` (default matches the simulator's 30), because PostHog only counts events after the start date. Results need traffic: real checkouts or `make simulate` (the simulator's `test` variant converts better, so the experiment finds a winner)
+- `App\Analytics\PostHogProject` wraps the management API (`ui_host` + `/api/projects/@current/`, Laravel `Http`, Bearer personal key). Only `phx_` keys are accepted: a project secret key (`phs_`) serves flag definitions but not the management API. Experiments created on an existing flag must omit `parameters.feature_flag_variants`, or the API refuses them
 
 ## Domain events to analytics
 

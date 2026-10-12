@@ -2,7 +2,7 @@
 
 EXEC = docker compose exec app
 
-.PHONY: help setup up down build restart shell migrate seed fresh test test-js dusk logs queue-logs queue-restart scheduler-logs schedule-list simulate simulate-unstitched sync-groups assets vite
+.PHONY: help setup up down build restart shell migrate seed fresh test test-js dusk logs queue-logs queue-restart scheduler-logs schedule-list simulate simulate-unstitched sync-groups posthog-setup assets vite
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -77,6 +77,9 @@ simulate-unstitched: ## Same traffic without identity stitching, to show the bro
 
 sync-groups: ## Send every supporters club to PostHog as a group
 	@$(EXEC) php artisan matchday:sync-groups
+
+posthog-setup: ## Create the flags, experiment and exit survey in PostHog (needs POSTHOG_PERSONAL_API_KEY)
+	@$(EXEC) php artisan matchday:posthog-setup --days=$(DAYS)
 
 assets: ## Build front-end assets with Vite (runs on the host)
 	@npm run build

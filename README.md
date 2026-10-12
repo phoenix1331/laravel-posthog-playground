@@ -73,12 +73,15 @@ Test cards: `4242 4242 4242 4242` pays, `4000 0000 0000 0002` is declined. Nothi
 
 ### Connecting PostHog
 
-1. Put your project token (`phc_...`) in `POSTHOG_PROJECT_TOKEN`, and a personal API key (`phx_...`) in `POSTHOG_PERSONAL_API_KEY` for local flag evaluation
-2. In PostHog, create the flags the app reads:
-   - `new-seat-picker`: boolean, 20% rollout
-   - `checkout-cta`: multivariate, `control` and `test` at 50% each, then an experiment on it with `ticket_purchased` as the primary metric
-3. Optionally create an "API" survey with one multiple-choice question for the exit survey and put its ID in `POSTHOG_EXIT_SURVEY_ID`
+1. Use a PostHog Cloud EU project, or point the three `POSTHOG_*_HOST` keys at your region
+2. Put your project token (`phc_...`) in `POSTHOG_PROJECT_TOKEN`, and a personal API key (`phx_...`) in `POSTHOG_PERSONAL_API_KEY`. Give the key write access to feature flags, experiments and surveys: the app uses it for local flag evaluation and the setup command uses it to configure the project
+3. `make posthog-setup` creates everything the app expects and is safe to re-run (anything that already exists is left alone):
+   - `new-seat-picker`: boolean flag, 20% rollout
+   - `checkout-cta`: multivariate flag, `control` and `test` at 50% each
+   - "Checkout CTA wording" experiment on `checkout-cta`, a `checkout_started` to `ticket_purchased` funnel, launched with a start date 30 days back so simulated traffic counts (`DAYS=7` to change it)
+   - "Checkout exit survey", an API survey with the six exit reasons, its ID written to `POSTHOG_EXIT_SURVEY_ID` in `.env`
 4. `make queue-restart`, then `make sync-groups` and `make simulate`
+5. In PostHog, turn on session replay under Settings, the one thing the API setup leaves to you
 
 ## Environment variables
 
