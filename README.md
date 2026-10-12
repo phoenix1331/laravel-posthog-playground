@@ -64,6 +64,9 @@ Two things make it a playground rather than a demo:
 
 `make help` lists every target. Day to day: `make up`, `make down`, `make logs`, `make queue-restart` after changing PHP code the worker runs.
 
+### make simulate output
+<img width="2518" height="1586" alt="Screenshot 2026-10-12 172708" src="https://github.com/user-attachments/assets/1b1e4fd5-c062-416c-b3b7-30cd0551a3ca" />
+
 ### Seeded logins
 
 All passwords are `password`.
