@@ -7,6 +7,7 @@ use App\Analytics\FakeAnalytics;
 use App\Analytics\Flags\FlagScope;
 use App\Analytics\Flags\PostHogFlags;
 use App\Analytics\Flags\Rollout;
+use App\Enums\ExitReason;
 use App\Features\CheckoutCta;
 use App\Features\NewSeatPicker;
 use App\Models\Basket;
@@ -130,6 +131,24 @@ it('sends loyal away fans to the away end with a coach and their supporters club
         && isset($call['properties']['supporters_club']));
 });
 
+it('answers the exit survey for some abandoned checkouts, before the abandonment lands', function (): void {
+    $report = app(Simulator::class)->run(300, 30, seed: 1331);
+
+    $answers = $this->analytics->captured(Events::EXIT_SURVEY_ANSWERED);
+    $abandoned = collect($this->analytics->captured(Events::CHECKOUT_ABANDONED))->keyBy('distinct_id');
+
+    expect($answers)->not->toBeEmpty()
+        ->and(count($answers))->toBe($report->count(Events::EXIT_SURVEY_ANSWERED))
+        ->and(count($answers))->toBeLessThan($abandoned->count())
+        ->and(array_sum($report->exitReasons()))->toBe(count($answers));
+
+    foreach ($answers as $answer) {
+        expect($abandoned)->toHaveKey($answer['distinct_id'])
+            ->and(ExitReason::tryFrom($answer['properties']['exit_reason']))->not->toBeNull()
+            ->and($answer['timestamp']->lt($abandoned[$answer['distinct_id']]['timestamp']))->toBeTrue();
+    }
+});
+
 it('is repeatable with a seed', function (): void {
     app(Simulator::class)->run(80, 30, seed: 99);
     $first = allCaptured($this->analytics)->map(fn (array $call): string => $call['distinct_id'].$call['event'].$call['timestamp'])->all();
@@ -157,6 +176,7 @@ it('runs from artisan and prints the funnel', function (): void {
     $this->artisan('matchday:simulate', ['--users' => 50, '--days' => 7, '--seed' => 1])
         ->expectsOutputToContain('No PostHog token')
         ->expectsOutputToContain('fixture_viewed')
+        ->expectsOutputToContain('Exit survey answer')
         ->expectsOutputToContain('events generated')
         ->expectsOutputToContain('logins aliased')
         ->assertSuccessful();

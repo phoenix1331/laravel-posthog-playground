@@ -37,6 +37,7 @@
         <env name="POSTHOG_PROJECT_TOKEN" value=""/>
         <env name="POSTHOG_PERSONAL_API_KEY" value=""/>
         <env name="POSTHOG_LOG_CHANNEL" value=""/>
+        <env name="POSTHOG_EXIT_SURVEY_ID" value=""/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

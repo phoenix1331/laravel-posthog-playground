@@ -9,13 +9,14 @@ use App\Analytics\PostHogProject;
 use App\Enums\ExitReason;
 use App\Features\CheckoutCta;
 use App\Features\NewSeatPicker;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
 #[Signature('matchday:posthog-setup
-    {--days=30 : Backdate the experiment start this many days, to match the simulator}')]
+    {--days=30 : Backdate the experiment and survey starts this many days, to match the simulator}')]
 #[Description('Create the flags, experiment and exit survey this app expects in PostHog')]
 class SetUpPostHog extends Command
 {
@@ -43,9 +44,13 @@ class SetUpPostHog extends Command
                 ->all()],
         ]);
 
-        $this->ensureExperiment($posthog);
+        // PostHog only counts experiment and survey events after the start
+        // date, and simulated traffic is backdated
+        $startsAt = CarbonImmutable::now()->subDays((int) $this->option('days'))->startOfDay();
 
-        $surveyId = $this->ensureExitSurvey($posthog);
+        $this->ensureExperiment($posthog, $startsAt);
+
+        $surveyId = $this->ensureExitSurvey($posthog, $startsAt);
         $this->storeSurveyId($surveyId);
 
         $this->newLine();
@@ -74,7 +79,7 @@ class SetUpPostHog extends Command
      * Linked to the existing checkout-cta flag and launched with a backdated
      * start, so simulated traffic counts towards the results.
      */
-    private function ensureExperiment(PostHogProject $posthog): void
+    private function ensureExperiment(PostHogProject $posthog, CarbonImmutable $startsAt): void
     {
         $label = 'Experiment <fg=cyan>'.CheckoutCta::key().'</>';
         $experiment = $posthog->experimentFor(CheckoutCta::key());
@@ -102,7 +107,6 @@ class SetUpPostHog extends Command
             ]],
         ]);
 
-        $startsAt = now()->subDays((int) $this->option('days'))->startOfDay();
         $posthog->updateExperiment($experiment['id'], ['start_date' => $startsAt->toIso8601ZuluString()]);
 
         $this->components->twoColumnDetail($label, "<fg=green>launched from {$startsAt->toDateString()}</>");
@@ -110,32 +114,42 @@ class SetUpPostHog extends Command
 
     /**
      * An "API" survey: the app shows its own dialog, and answers reach
-     * PostHog as "survey sent" events carrying the reason's label.
+     * PostHog as "survey sent" events carrying the reason's label. An
+     * existing survey that starts later than the window is moved back, so
+     * simulated answers show on its results.
      */
-    private function ensureExitSurvey(PostHogProject $posthog): string
+    private function ensureExitSurvey(PostHogProject $posthog, CarbonImmutable $startsAt): string
     {
         $label = 'Survey <fg=cyan>'.self::EXIT_SURVEY_NAME.'</>';
         $survey = $posthog->surveyNamed(self::EXIT_SURVEY_NAME);
+        $start = $startsAt->toIso8601ZuluString();
 
-        if ($survey !== null) {
-            $this->components->twoColumnDetail($label, 'exists, left as is');
+        if ($survey === null) {
+            $survey = $posthog->createSurvey([
+                'name' => self::EXIT_SURVEY_NAME,
+                'description' => 'Asked on exit intent from the checkout page',
+                'type' => 'api',
+                'questions' => [[
+                    'type' => 'single_choice',
+                    'question' => 'Before you go, what stopped you?',
+                    'choices' => array_map(fn (ExitReason $reason): string => $reason->label(), ExitReason::cases()),
+                ]],
+                'start_date' => $start,
+            ]);
+
+            $this->components->twoColumnDetail($label, "<fg=green>launched from {$startsAt->toDateString()}</>");
 
             return (string) $survey['id'];
         }
 
-        $survey = $posthog->createSurvey([
-            'name' => self::EXIT_SURVEY_NAME,
-            'description' => 'Asked on exit intent from the checkout page',
-            'type' => 'api',
-            'questions' => [[
-                'type' => 'single_choice',
-                'question' => 'Before you go, what stopped you?',
-                'choices' => array_map(fn (ExitReason $reason): string => $reason->label(), ExitReason::cases()),
-            ]],
-            'start_date' => now()->toIso8601ZuluString(),
-        ]);
+        if ($survey['start_date'] === null || CarbonImmutable::parse($survey['start_date'])->gt($startsAt)) {
+            $posthog->updateSurvey((string) $survey['id'], ['start_date' => $start]);
+            $this->components->twoColumnDetail($label, "<fg=green>start moved back to {$startsAt->toDateString()}</>");
 
-        $this->components->twoColumnDetail($label, '<fg=green>created and launched</>');
+            return (string) $survey['id'];
+        }
+
+        $this->components->twoColumnDetail($label, 'exists, left as is');
 
         return (string) $survey['id'];
     }

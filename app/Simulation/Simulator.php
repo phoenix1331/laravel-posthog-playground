@@ -7,7 +7,9 @@ namespace App\Simulation;
 use App\Analytics\DistinctId;
 use App\Analytics\Events;
 use App\Analytics\Flags\FlagScope;
+use App\Enums\ExitReason;
 use App\Events\CheckoutAbandoned;
+use App\Events\CheckoutExitSurveyAnswered;
 use App\Events\CheckoutStarted;
 use App\Events\FixtureViewed;
 use App\Events\SeatSelected;
@@ -49,7 +51,8 @@ use RuntimeException;
  * simulated visitor gets the same variant (and exposure event, backdated)
  * PostHog or the fallback would give them; the stadium-map picker nudges
  * seat selection up slightly and the "test" checkout button lifts purchases,
- * so both the rollout and the experiment show an effect.
+ * so both the rollout and the experiment show an effect. Some supporters who
+ * leave checkout answer the exit survey, with reasons that suit their persona.
  */
 class Simulator
 {
@@ -64,6 +67,9 @@ class Simulator
 
     /** Extra percentage points of purchase for supporters shown the "test" checkout button */
     private const int CHECKOUT_CTA_LIFT = 8;
+
+    /** Share of supporters leaving checkout who answer the exit survey */
+    private const int EXIT_SURVEY_ANSWER_CHANCE = 35;
 
     private Randomizer $random;
 
@@ -157,6 +163,10 @@ class Simulator
         $this->report->event(Events::CHECKOUT_STARTED);
 
         if (! $this->chance($this->purchaseChance($persona, $cta))) {
+            if ($this->chance(self::EXIT_SURVEY_ANSWER_CHANCE)) {
+                $this->answerExitSurvey($persona, $basket, $supporter, $this->later($at, 30, 600));
+            }
+
             CheckoutAbandoned::dispatch($basket, $supporter, $at->addMinutes(Basket::ABANDON_AFTER_MINUTES));
             $this->report->event(Events::CHECKOUT_ABANDONED);
 
@@ -167,6 +177,20 @@ class Simulator
         $this->report->event(Events::TICKET_PURCHASED);
         $this->report->purchaser();
         $this->report->checkoutCtaPurchased();
+    }
+
+    /**
+     * What ExitSurveyController does when the exit-intent dialog is answered,
+     * a few minutes into checkout and before the basket is swept as abandoned.
+     */
+    private function answerExitSurvey(Persona $persona, Basket $basket, User $supporter, CarbonImmutable $at): void
+    {
+        $reason = ExitReason::from($this->weighted($persona->exitReasons()));
+        $basket->exit_reason = $reason;
+
+        CheckoutExitSurveyAnswered::dispatch($basket, $supporter, $reason, $at);
+        $this->report->event(Events::EXIT_SURVEY_ANSWERED);
+        $this->report->exitReason($reason);
     }
 
     /**
@@ -350,17 +374,27 @@ class Simulator
 
     private function pickPersona(): Persona
     {
-        $roll = $this->random->getInt(1, array_sum(array_map(fn (Persona $persona): int => $persona->weight(), Persona::cases())));
+        $weights = collect(Persona::cases())->mapWithKeys(fn (Persona $persona): array => [$persona->value => $persona->weight()]);
 
-        foreach (Persona::cases() as $persona) {
-            $roll -= $persona->weight();
+        return Persona::from($this->weighted($weights->all()));
+    }
+
+    /**
+     * @param  array<string, int>  $weights  key => relative weight
+     */
+    private function weighted(array $weights): string
+    {
+        $roll = $this->random->getInt(1, array_sum($weights));
+
+        foreach ($weights as $key => $weight) {
+            $roll -= $weight;
 
             if ($roll <= 0) {
-                return $persona;
+                return (string) $key;
             }
         }
 
-        return Persona::Browser;
+        return (string) array_key_last($weights);
     }
 
     /**

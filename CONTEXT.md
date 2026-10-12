@@ -184,6 +184,7 @@ Controller / PlaceBooking  ->  App\Events\*  ->  AnalyticsEventSubscriber  ->  A
 | Analytics | Subscriber always captures `exit_survey_answered` (basket properties + `exit_reason`). With `POSTHOG_EXIT_SURVEY_ID` set (an "API" survey in PostHog with one multiple-choice question), also `survey sent` with `$survey_id` and `$survey_response` (the reason's label), so answers appear on PostHog's survey results; the browser captures `survey shown` and `survey dismissed` for the same ID |
 
 - Answers are first-party data on the basket, so they exist without PostHog; analytics for them still follows consent
+- The simulator answers the survey for 35% of abandoned checkouts (`Simulator::EXIT_SURVEY_ANSWER_CHANCE`), a few minutes after `checkout_started` and before `checkout_abandoned`, with reasons weighted per persona (`Persona::exitReasons()`: bargain hunters mostly price, loyal fans mostly coach times). `make posthog-setup` moves the survey start back `--days` too, since PostHog's survey results ignore answers dated before it
 - Dusk journey "answers the exit survey" dispatches the exit-intent `mouseout` in a real browser and checks the stored reason
 
 ## Error tracking

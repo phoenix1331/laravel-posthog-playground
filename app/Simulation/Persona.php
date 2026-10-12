@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Simulation;
 
+use App\Enums\ExitReason;
+
 /**
  * Kinds of simulated supporter. Each has a share of traffic and its own
  * odds of moving to the next funnel step, which together give the funnel
@@ -112,6 +114,42 @@ enum Persona: string
             self::BargainHunter => 60,
             self::LoyalAwayFan => 90,
             self::Abandoner => 0,
+        };
+    }
+
+    /**
+     * Relative likelihood of each exit survey answer when this persona
+     * leaves checkout, so the survey results tell a story per persona.
+     *
+     * @return array<string, int> ExitReason value => weight
+     */
+    public function exitReasons(): array
+    {
+        return match ($this) {
+            self::Browser => [
+                ExitReason::JustBrowsing->value => 50,
+                ExitReason::TooExpensive->value => 20,
+                ExitReason::WrongSeats->value => 15,
+                ExitReason::Other->value => 15,
+            ],
+            self::BargainHunter => [
+                ExitReason::TooExpensive->value => 60,
+                ExitReason::WrongSeats->value => 20,
+                ExitReason::JustBrowsing->value => 10,
+                ExitReason::Other->value => 10,
+            ],
+            self::LoyalAwayFan => [
+                ExitReason::TravelOptions->value => 55,
+                ExitReason::WrongSeats->value => 25,
+                ExitReason::PaymentConcerns->value => 10,
+                ExitReason::Other->value => 10,
+            ],
+            self::Abandoner => [
+                ExitReason::PaymentConcerns->value => 40,
+                ExitReason::TooExpensive->value => 30,
+                ExitReason::TravelOptions->value => 15,
+                ExitReason::Other->value => 15,
+            ],
         };
     }
 }

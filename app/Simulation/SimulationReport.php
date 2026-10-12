@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Simulation;
 
 use App\Analytics\Events;
+use App\Enums\ExitReason;
 
 /**
  * Tally of what a simulation run produced, so the funnel can be checked
@@ -34,6 +35,9 @@ final class SimulationReport
     private array $checkoutCta = [];
 
     private ?string $currentCheckoutCta = null;
+
+    /** @var array<string, int> exit reason label => answers */
+    private array $exitReasons = [];
 
     public function __construct(public readonly bool $stitching = true)
     {
@@ -114,6 +118,23 @@ final class SimulationReport
                 'rate' => $counts['checkouts'] === 0 ? 0.0 : round($counts['purchases'] / $counts['checkouts'] * 100, 1),
             ])
             ->all();
+    }
+
+    public function exitReason(ExitReason $reason): void
+    {
+        $this->exitReasons[$reason->label()] = ($this->exitReasons[$reason->label()] ?? 0) + 1;
+    }
+
+    /**
+     * Exit survey answers per reason, most common first.
+     *
+     * @return array<string, int>
+     */
+    public function exitReasons(): array
+    {
+        arsort($this->exitReasons);
+
+        return $this->exitReasons;
     }
 
     public function login(): void

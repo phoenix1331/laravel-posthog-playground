@@ -86,7 +86,7 @@ Test cards: `4242 4242 4242 4242` pays, `4000 0000 0000 0002` is declined. Nothi
    - `new-seat-picker`: boolean flag, 20% rollout
    - `checkout-cta`: multivariate flag, `control` and `test` at 50% each
    - "Checkout CTA wording" experiment on `checkout-cta`, a `checkout_started` to `ticket_purchased` funnel, launched with a start date 30 days back so simulated traffic counts (`DAYS=7` to change it)
-   - "Checkout exit survey", an API survey with the six exit reasons, its ID written to `POSTHOG_EXIT_SURVEY_ID` in `.env`
+   - "Checkout exit survey", an API survey with the six exit reasons, started on the same backdated date (the simulator answers it for some abandoned checkouts), its ID written to `POSTHOG_EXIT_SURVEY_ID` in `.env`
 4. `make queue-restart`, then `make sync-groups` and `make simulate`
 5. In PostHog, turn on session replay under Settings, the one thing the API setup leaves to you
 

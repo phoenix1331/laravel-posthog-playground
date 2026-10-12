@@ -77,6 +77,10 @@ class SimulateMatchday extends Command
             ->map(fn (array $variant, string $value): array => [$value, $variant['checkouts'], $variant['purchases'], $variant['rate'].'%'])
             ->values());
 
+        $this->table(['Exit survey answer', 'Answers'], collect($report->exitReasons())
+            ->map(fn (int $count, string $reason): array => [$reason, $count])
+            ->values());
+
         $this->components->info("{$report->total()} events generated.");
         $this->describeStitching($report);
 

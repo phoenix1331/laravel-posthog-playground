@@ -87,6 +87,15 @@ class PostHogProject
     }
 
     /**
+     * @param  array<string, mixed>  $changes
+     * @return array<string, mixed>
+     */
+    public function updateSurvey(string $id, array $changes): array
+    {
+        return $this->send('patch', "surveys/{$id}/", $changes);
+    }
+
+    /**
      * @param  array<string, mixed>  $query
      * @param  callable(array<string, mixed>): bool  $matches
      * @return array<string, mixed>|null

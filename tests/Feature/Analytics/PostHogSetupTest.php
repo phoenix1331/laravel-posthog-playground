@@ -77,6 +77,7 @@ it('creates both flags, a launched experiment and the exit survey on an empty pr
 
     [$survey] = sentTo('POST', 'surveys/');
     expect($survey['type'])->toBe('api')
+        ->and($survey['start_date'])->toBe('2026-09-12T00:00:00Z')
         ->and($survey['questions'][0]['choices'])->toBe(array_map(fn (ExitReason $reason) => $reason->label(), ExitReason::cases()));
 
     expect(file_get_contents($this->envDir.'/.env'))->toContain("POSTHOG_EXIT_SURVEY_ID=survey-uuid\n")
@@ -87,7 +88,7 @@ it('leaves everything that already exists alone, so it is safe to run again', fu
     fakePostHogApi([
         'feature_flags/' => [['key' => 'new-seat-picker'], ['key' => 'checkout-cta']],
         'experiments/' => [['id' => 7, 'feature_flag_key' => 'checkout-cta', 'start_date' => '2026-09-12T00:00:00Z']],
-        'surveys/' => [['id' => 'survey-uuid', 'name' => SetUpPostHog::EXIT_SURVEY_NAME]],
+        'surveys/' => [['id' => 'survey-uuid', 'name' => SetUpPostHog::EXIT_SURVEY_NAME, 'start_date' => '2026-09-01T00:00:00Z']],
     ]);
 
     $this->artisan('matchday:posthog-setup')->assertSuccessful();
@@ -105,6 +106,17 @@ it('launches an experiment left in draft instead of creating another', function 
 
     expect(sentTo('POST', 'experiments/'))->toBe([])
         ->and(sentTo('PATCH', 'experiments/9/'))->toBe([['start_date' => '2026-10-05T00:00:00Z']]);
+});
+
+it('moves an existing survey start back so backdated answers show on its results', function (): void {
+    fakePostHogApi([
+        'surveys/' => [['id' => 'survey-uuid', 'name' => SetUpPostHog::EXIT_SURVEY_NAME, 'start_date' => '2026-10-12T14:00:00Z']],
+    ]);
+
+    $this->artisan('matchday:posthog-setup')->assertSuccessful();
+
+    expect(sentTo('POST', 'surveys/'))->toBe([])
+        ->and(sentTo('PATCH', 'surveys/survey-uuid/'))->toBe([['start_date' => '2026-09-12T00:00:00Z']]);
 });
 
 it('refuses to run without a personal api key', function (string $key): void {
